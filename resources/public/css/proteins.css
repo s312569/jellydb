@@ -1,0 +1,60 @@
+label.protsumm {
+    display: block;
+    margin-left: 20px;
+}
+
+input.protsumm {
+    float: left;
+    margin-left: -20px;
+    margin-right: 7px;
+}
+
+input.pagination {
+    height: 42px;
+    background: #3695c6;
+    border: 1px solid #1C89C4;
+    display: inline-block;
+    
+    font-family: "Open-sans", Sans-serif;
+    font-size: 14px;
+    font-weight: bold;
+    text-decoration: none;
+    letter-spacing: 0;
+    color: #fff;
+    line-height: 42px;
+    
+    cursor: pointer;
+    padding-left: 15px;
+    padding-right: 15px;
+    margin-bottom: 18px;
+    
+    -webkit-transition: all .2s ease-in-out;
+    -moz-transition: all .2s ease-in-out;
+    -o-transition: all .2s ease-in-out;
+    -ms-transition: all .2s ease-in-out;
+    transition: all .2s ease-in-out;
+    
+    text-shadow: 0 -1px 0 rgba(0,0,0,0.3);
+    
+    box-shadow: 0px 1px 2px rgba(0,0,0,0.3), 0 1px 0 rgba(255, 255, 255, 0.3) inset;
+}
+
+#downloadframe {display: none;}
+
+
+/* search box */
+
+.padded {padding-top: 1em;
+	 padding-bottom: 1em;
+	 padding-right: 0.25em;
+	 padding-left: 0.25em;}
+
+.myinput {padding:.5em .6em;
+	  display:inline-block;
+	  border:1px solid #ccc;
+	  box-shadow:inset 0 1px 3px #ddd;
+	  border-radius:4px;
+	  vertical-align:middle;
+	  -webkit-box-sizing:border-box;
+	  -moz-box-sizing:border-box;
+	  box-sizing:border-box}
