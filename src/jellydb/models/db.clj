@@ -195,16 +195,16 @@
 
 (defn get-all-proteins
   [o]
-  (let [q (str "select array_to_json(array_agg(row_to_json(t))) from (select * from peps order by acc OFFSET " o " limit 20) t")]
-    (db/query spec q :row-fn #(-> (:array_to_json %)
-                                  .getValue
-                                  json/read-str)
-              :result-set-fn first)))
+  (if-let [q (str "select array_to_json(array_agg(row_to_json(t))) from (select * from peps order by acc OFFSET " o " limit 20) t")]
+    {:status "success" :proteins (db/query spec q :row-fn #(-> (:array_to_json %)
+                                                               .getValue
+                                                               json/read-str)
+                                           :result-set-fn first)}))
 
 (defn count-query
   []
   (let [q "select count(*) from peps"]
-    (db/query spec q :result-set-fn first)))
+    (merge {:status "success"} (db/query spec q :result-set-fn first))))
 
 (defn fasta-proteins
   [req-id]
@@ -219,7 +219,7 @@
                                                 bs->fasta)))]
         (swap! req-key-map dissoc req-id)
         r)
-      {:status :fail :msg "ERROR MESSAGE!"})))
+      {:status "fail" :msg "ERROR MESSAGE!"})))
 
 (defn proteins-key
   [req-ids]
