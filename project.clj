@@ -7,6 +7,7 @@
                  [org.clojars.hozumi/clj-commons-exec "1.2.0"]
                  [com.taoensso/nippy "2.10.0"]
                  [postgresql "9.3-1102.jdbc41"]
+                 [org.clojure/tools.nrepl "0.2.12"]
                  [org.clojure/java.jdbc "0.4.2"]
                  [clj-biosequence "0.4.7"]
                  [org.clojure/clojure "1.7.0"]

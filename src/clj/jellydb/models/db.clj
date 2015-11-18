@@ -410,7 +410,7 @@
        '(:pmids :assemblies :submitters :mrnas :cds :peps :contigs
          :blasts :ips)))
 
-;; (import-assembled-fasta "/home/jason/Dropbox/jellydb/resources/test-data/trinity-assembly/Trinity.fasta"
+;; (import-assembled-fasta "/home/jason/Dropbox/jellydb/resources/test-data/Trinity.fasta"
 ;;                               :submitter {:first "Jason"
 ;;                                           :last "Mulvenna"
 ;;                                           :email "jason.mulvenna@gmail.com"
