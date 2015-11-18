@@ -196,9 +196,10 @@
 (defn get-all-proteins
   [o]
   (if-let [q (str "select array_to_json(array_agg(row_to_json(t))) from (select * from peps order by acc OFFSET " o " limit 20) t")]
-    {:status "success" :proteins (db/query spec q :row-fn #(-> (:array_to_json %)
-                                                               .getValue
-                                                               json/read-str)
+    {:status "success" :proteins (db/query spec q
+                                           :row-fn #(-> (:array_to_json %)
+                                                        .getValue
+                                                        json/read-str)
                                            :result-set-fn first)}))
 
 (defn count-query
@@ -228,6 +229,22 @@
       (do (swap! req-key-map assoc id req-ids)
           {:status :success :id id})
       (proteins-key req-ids))))
+
+(defn get-assembly [id]
+  (let [q (str "select * from assemblies where id=" id)]
+    (query-db q :result-set-fn first)))
+
+(defn get-pep [id]
+  (let [s (select-keys (get-biosequence {:acc id :table :peps})
+                       [:description :sequence])
+        ss (->> (partition-all 55 (:sequence s))
+                (map #(apply str %))
+                (interpose "\n")
+                (apply str))
+        assembly (query-db )]
+    {:status "success"
+     :protein {:description (:description s)
+               :sequence ss}}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; importing

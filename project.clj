@@ -8,33 +8,36 @@
                  [com.taoensso/nippy "2.10.0"]
                  [postgresql "9.3-1102.jdbc41"]
                  [org.clojure/java.jdbc "0.4.2"]
-                 [clj-biosequence "0.4.6"]
+                 [clj-biosequence "0.4.7"]
                  [org.clojure/clojure "1.7.0"]
                  [org.clojure/tools.reader "0.10.0"]
-                 [org.clojure/clojurescript "1.7.145"]
-                 [org.clojure/core.async "0.1.346.0-17112a-alpha"]
+                 [org.clojure/clojurescript "1.7.170"]
+                 [org.clojure/core.async "0.2.374"]
                  [cljs-http "0.1.37"]
                  [org.clojure/data.json "0.2.6"]
-                 [cljs-ajax "0.5.0"]
+                 [cljs-ajax "0.5.1"]
                  [hiccup "1.0.5"]
                  [om "0.7.3"]
                  [compojure "1.4.0"]
-                 [com.cognitect/transit-cljs "0.8.225"]
+                 [com.cognitect/transit-cljs "0.8.232"]
                  [ring-server "0.4.0"]
                  [ring/ring-core "1.4.0"]
                  [ring/ring-json "0.4.0"]
                  [ring/ring-defaults "0.1.5"]]
-  :plugins [[lein-cljsbuild "1.0.3"]
-            [lein-ring "0.8.13"]
-            [lein-pdo "0.1.1"]]
-  :aliases {"up" ["pdo" "cljsbuild" "auto" "dev," "ring" "server-headless"]}
+  :plugins [[cider/cider-nrepl "0.10.0-SNAPSHOT"]
+            [lein-cljsbuild "1.0.5"]
+            [lein-figwheel "0.5.0-1"]]
+  :source-paths ["src/clj" "src/cljs"]
+  :resource-paths ["resources"]
+  :clean-targets ^{:protect false} ["resources/public/js/out"
+                                    "resources/public/js/app.js"]
+  :figwheel {:ring-handler jellydb.handler/app}
   :cljsbuild {:builds [{:id "dev"
-                        :source-paths ["src/cljs"]
+                        :source-paths ["src/clj" "src/cljs"]
+                        :figwheel true
                         :compiler {:output-to "resources/public/js/app.js"
                                    :output-dir "resources/public/js/out"
+                                   :main acme.core
+                                   :asset-path "js/out"
                                    :optimizations :none
-                                   :source-map true}}]}
-  :ring {:handler jellydb.handler/app}
-  :profiles
-  {:dev {:dependencies [[javax.servlet/servlet-api "2.5"]
-                        [ring-mock "0.1.5"]]}})
+                                   :source-map true}}]})

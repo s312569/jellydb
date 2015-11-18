@@ -28,6 +28,8 @@
   (POST "/id-submit" req
         (let [p (:body req)]
           (response (db/proteins-key (last p)))))
+  (GET "/peptide" [id]
+       (response (db/get-pep id)))
   (GET "/fetch" [k]
        (-> (db/fasta-proteins k)
            response

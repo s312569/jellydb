@@ -1,4 +1,4 @@
-(ns acme.core
+(ns ^:figwheel-always acme.core
   (:require-macros [cljs.core.async.macros :refer [go go-loop alt!]])
   (:require [goog.events :as events]
             [ajax.core :refer [GET POST]]
@@ -89,6 +89,18 @@
                            :error-handler error-handler
                            :response-format :json
                            :keywords? true})))
+
+(defn get-peptide
+  [owner]
+  (letfn [(h [{:keys [status protein msg]}]
+            (if (= "success" status)
+              (om/set-state! owner :peptide protein)
+              (js/alert msg)))]
+    (GET "/peptide" {:error-handler error-handler
+                     :params {:id (om/get-state owner :accession)}
+                     :handler h
+                     :response-format :json
+                     :keywords? true})))
 
 ;; loops
 
@@ -258,7 +270,10 @@
              :onChange (fn [_]
                          (pub-info owner :selected acc)
                          (om/set-state! owner :checked (not checked)))}
-        (dom/a #js {:href "#" :width "100%"}
+        (dom/a #js {:width "100%"
+                    :onClick #(put! (:pub-chan (om/get-shared owner))
+                                    {:topic :view :view :protein
+                                     :data acc})}
                description)
         (dom/div nil (dom/span #js {:style #js {:paddingRight "15px"}}
                                (str (count sequence) " amino acid protein"))
@@ -267,7 +282,7 @@
                       #js {:href "#"}
                       "Something else")))))))
 
-(defn protein-view [search owner]
+(defn proteins-view [search owner]
   (reify
     om/IInitState
     (init-state [_]
@@ -305,6 +320,40 @@
                       (om/build-all protein proteins))
                (om/build nav nil)))))
 
+(defn protein-view [acc owner]
+  (reify
+    om/IInitState
+    (init-state [_]
+      {:accession acc
+       :peptide nil})
+    om/IWillMount
+    (will-mount [_]
+      (get-peptide owner))
+    om/IRenderState
+    (render-state [_ {:keys [accession peptide]}]
+      (dom/div nil
+               (dom/div
+                #js {:className "thick padded"}
+                (str accession " - " (:description peptide)))
+               (dom/div
+                #js {:className "pure-g"}
+                (dom/div #js {:className "pure-u-1-5 thick padded"}
+                         "Accession:")
+                (dom/div #js {:className "pure-u-3-5 padded"}
+                         accession))
+               (dom/div
+                #js {:className "pure-g"}
+                (dom/div #js {:className "pure-u-1-5 thick padded"}
+                         "Description:")
+                (dom/div #js {:className "pure-u-3-5 padded"}
+                         (:description peptide)))
+               (dom/div
+                #js {:className "pure-g"}
+                (dom/div #js {:className "pure-u-1-5 thick padded"}
+                         "Protein sequence:")
+                (dom/div #js {:className "pure-u-3-5 padded"}
+                         (:sequence peptide)))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; home
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -338,7 +387,8 @@
       (dom/div nil
                (condp = view
                  :home (om/build home {})
-                 :proteins (om/build protein-view data))))))
+                 :proteins (om/build proteins-view data)
+                 :protein (om/build protein-view data))))))
 
 (defn outer
   [app owner]
