@@ -162,7 +162,7 @@
   (let [text (om/get-state owner :text)]
     (if-not (= text "")
       (do (put! (:pub-chan (om/get-shared owner))
-                {:topic :view :view :proteins
+                {:topic :view :view "proteins"
                  :data text})
           (om/set-state! owner :text ""))
       (js/alert "No search entered!"))))
@@ -262,25 +262,45 @@
       (check-if-checked owner np))
     om/IRenderState
     (render-state [_ {:keys [checked]}]
-      (dom/label
-       #js {:className "protsumm"}
-       (dom/input
-        #js {:className "protsumm" :type "checkbox"
-             :checked checked
-             :onChange (fn [_]
-                         (pub-info owner :selected acc)
-                         (om/set-state! owner :checked (not checked)))}
-        (dom/a #js {:width "100%"
-                    :onClick #(put! (:pub-chan (om/get-shared owner))
-                                    {:topic :view :view :protein
-                                     :data acc})}
-               description)
-        (dom/div nil (dom/span #js {:style #js {:paddingRight "15px"}}
-                               (str (count sequence) " amino acid protein"))
-                 (dom/span nil (str "JellyDB accession: " acc)))
-        (dom/div nil (dom/a
-                      #js {:href "#"}
-                      "Something else")))))))
+      (dom/div nil
+               (dom/div
+                #js {:className "pure-g"}
+                (dom/div
+                 #js {:className "pure-u-1-24"}
+                 (dom/input
+                  #js {:type "checkbox"
+                       :checked checked
+                       :onChange (fn [_]
+                                   (pub-info owner :selected acc)
+                                   (om/set-state! owner :checked (not checked)))}))
+                (dom/div
+                 #js {:className "pure-u-23-24"}
+                 (dom/a #js {:width "100%"
+                             :onClick #(put! (:pub-chan (om/get-shared owner))
+                                             {:topic :view :view "protein"
+                                              :data acc})}
+                        description)))
+               (dom/div
+                #js {:className "pure-g"}
+                (dom/div
+                 #js {:className "pure-u-1-24"}
+                 "")
+                (dom/div
+                 #js {:className "pure-u-5-24 protsumm"}
+                 (str (count sequence) " amino acid protein"))
+                (dom/div
+                 #js {:className "pure-u-18-24 protsumm"}
+                 (str "JellyDB accession: " acc)))
+               (dom/div
+                #js {:className "pure-g"}
+                (dom/div
+                 #js {:className "pure-u-1-24"}
+                 "")
+                (dom/div
+                 #js {:className "pure-u-23-24"}
+                 (dom/a
+                  #js {:href "#"}
+                  "Something else")))))))
 
 (defn proteins-view [search owner]
   (reify
@@ -304,9 +324,15 @@
       (export-loop owner))
     om/IWillReceiveProps
     (will-receive-props [_ np]
-      (om/set-state! owner :search np))
+      (om/set-state! owner :search np)
+      (om/set-state! owner :start 1)
+      (om/set-state! owner :selected [])
+      (om/set-state! owner :key "")
+      (serve-proteins owner)
+      (init-total-proteins owner))
     om/IRenderState
     (render-state [_ {:keys [proteins key search]}]
+      (log (str owner))
       (dom/div nil
                (dom/iframe #js {:id "downloadframe"
                                 :src (if-not (= key "")
@@ -332,6 +358,7 @@
     om/IRenderState
     (render-state [_ {:keys [accession peptide]}]
       (dom/div nil
+               ()
                (dom/div
                 #js {:className "thick padded"}
                 (str accession " - " (:description peptide)))
@@ -350,9 +377,27 @@
                (dom/div
                 #js {:className "pure-g"}
                 (dom/div #js {:className "pure-u-1-5 thick padded"}
+                         "Species:")
+                (dom/div #js {:className "pure-u-3-5 padded"}
+                         (:species peptide)))
+               (dom/div
+                #js {:className "pure-g"}
+                (dom/div #js {:className "pure-u-1-5 thick padded"}
                          "Protein sequence:")
                 (dom/div #js {:className "pure-u-3-5 padded"}
-                         (:sequence peptide)))))))
+                         (:sequence peptide)))
+               (dom/div
+                #js {:className "pure-g"}
+                (dom/div #js {:className "pure-u-1-5 thick padded"}
+                         "CDS:")
+                (dom/div #js {:className "pure-u-3-5 padded"}
+                         (:cds peptide)))
+               (dom/div
+                #js {:className "pure-g"}
+                (dom/div #js {:className "pure-u-1-5 thick padded"}
+                         "mRNA sequence:")
+                (dom/div #js {:className "pure-u-3-5 padded"}
+                         (:mrna peptide)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; home
@@ -372,7 +417,7 @@
   (reify
     om/IInitState
     (init-state [_]
-      {:view :home
+      {:view "home"
        :data nil})
     om/IDidMount
     (did-mount [_]
@@ -386,9 +431,9 @@
     (render-state [_ {:keys [view data]}]
       (dom/div nil
                (condp = view
-                 :home (om/build home {})
-                 :proteins (om/build proteins-view data)
-                 :protein (om/build protein-view data))))))
+                 "home" (om/build home {})
+                 "proteins" (om/build proteins-view data)
+                 "protein" (om/build protein-view data))))))
 
 (defn outer
   [app owner]

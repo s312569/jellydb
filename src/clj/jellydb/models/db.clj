@@ -185,6 +185,10 @@
   [q & rest]
   (apply db/query spec q rest))
 
+(defn get-assembly [id]
+  (let [q (str "select * from assemblies where id=" id)]
+    (query-db q :result-set-fn first)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; currently used by frontend
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -230,21 +234,27 @@
           {:status :success :id id})
       (proteins-key req-ids))))
 
-(defn get-assembly [id]
-  (let [q (str "select * from assemblies where id=" id)]
-    (query-db q :result-set-fn first)))
+(defn html-format
+  [s]
+  (->> (partition-all 55 s)
+       (map #(apply str %))
+       (interpose "\n")
+       (apply str)))
 
 (defn get-pep [id]
-  (let [s (select-keys (get-biosequence {:acc id :table :peps})
-                       [:description :sequence])
-        ss (->> (partition-all 55 (:sequence s))
-                (map #(apply str %))
-                (interpose "\n")
-                (apply str))
-        assembly (query-db )]
+  (let [s (as-> (select-keys (get-biosequence {:acc id :table :peps})
+                             [:description :sequence :dataset])
+              r
+            (assoc r :sequence (html-format (:sequence r)))
+            (assoc r :mrna (-> (get-biosequence {:table :mrnas :acc id})
+                               :sequence
+                               html-format ))
+            (assoc r :cds (-> (get-biosequence {:table :cds :acc id})
+                              :sequence
+                              html-format))
+            (merge r (get-assembly (:dataset r))))]
     {:status "success"
-     :protein {:description (:description s)
-               :sequence ss}}))
+     :protein s}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; importing
