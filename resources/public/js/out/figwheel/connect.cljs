@@ -1,3 +1,3 @@
-(ns figwheel.connect (:require [figwheel.client] [acme.core] [figwheel.client.utils]))
+(ns figwheel.connect (:require [jellydb.core] [figwheel.client] [figwheel.client.utils]))
 (figwheel.client/start {:build-id "dev", :websocket-url "ws://localhost:3449/figwheel-ws"})
 

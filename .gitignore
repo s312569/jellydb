@@ -10,3 +10,5 @@ pom.xml.asc
 /.nrepl-port
 resources/blast/
 figwheel_server.log
+resources/public/js/out/
+

@@ -11,7 +11,7 @@
    (include-js "js/out/goog/base.js")
    (include-js "/js/jquery-1.11.2.min.js")
    (include-js "/js/app.js")
-   [:script {:type "text/javascript"} "goog.require(\"acme.core\");"]))
+   [:script {:type "text/javascript"} "goog.require(\"jellydb.core\");"]))
 
 (defroutes home-routes
   (GET "/" [] (home)))

@@ -38,7 +38,7 @@
                         :figwheel true
                         :compiler {:output-to "resources/public/js/app.js"
                                    :output-dir "resources/public/js/out"
-                                   :main acme.core
+                                   :main jellydb.core
                                    :asset-path "js/out"
                                    :optimizations :none
                                    :source-map true}}]})
