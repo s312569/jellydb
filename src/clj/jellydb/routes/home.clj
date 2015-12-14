@@ -7,10 +7,10 @@
   []
   (layout/common
    [:div {:id "outer"}]
-   (include-js "http://fb.me/react-0.11.1.js")
+   (include-js "js/react-v0.11.1.js")
    (include-js "js/out/goog/base.js")
-   (include-js "/js/jquery-1.11.2.min.js")
    (include-js "/js/app.js")
+   (include-js "/js/out/processing.js")
    [:script {:type "text/javascript"} "goog.require(\"jellydb.core\");"]))
 
 (defroutes home-routes

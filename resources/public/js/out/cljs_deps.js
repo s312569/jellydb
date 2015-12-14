@@ -35,8 +35,13 @@ goog.addDependency("../no/en/core.js", ['no.en.core'], ['cljs.core', 'goog.crypt
 goog.addDependency("../cljs_http/util.js", ['cljs_http.util'], ['no.en.core', 'goog.Uri', 'cljs.core', 'goog.userAgent', 'cognitect.transit', 'clojure.string']);
 goog.addDependency("../cljs_http/core.js", ['cljs_http.core'], ['goog.net.Jsonp', 'goog.net.XhrIo', 'cljs.core', 'cljs_http.util', 'cljs.core.async', 'goog.net.EventType', 'clojure.string', 'goog.net.ErrorCode']);
 goog.addDependency("../cljs_http/client.js", ['cljs_http.client'], ['cljs_http.core', 'no.en.core', 'goog.Uri', 'cljs.core', 'cljs_http.util', 'cljs.core.async', 'clojure.string', 'cljs.reader']);
-goog.addDependency("../jellydb/proteins.js", ['jellydb.proteins'], ['ajax.core', 'jellydb.utilities', 'clojure.browser.repl', 'cljs.core', 'cljs_http.client', 'om.dom', 'cljs.core.async', 'om.core', 'goog.events']);
-goog.addDependency("../jellydb/protein.js", ['jellydb.protein'], ['ajax.core', 'jellydb.utilities', 'clojure.browser.repl', 'cljs.core', 'cljs_http.client', 'om.dom', 'cljs.core.async', 'om.core', 'goog.events']);
+goog.addDependency("../processing.js", ['org.processingjs.Processing'], []);
+goog.addDependency("../quil/middlewares/deprecated_options.js", ['quil.middlewares.deprecated_options'], ['cljs.core']);
+goog.addDependency("../quil/util.js", ['quil.util'], ['cljs.core', 'clojure.string']);
+goog.addDependency("../quil/sketch.js", ['quil.sketch'], ['goog.dom', 'cljs.core', 'quil.middlewares.deprecated_options', 'goog.events.EventType', 'goog.events', 'quil.util']);
+goog.addDependency("../quil/core.js", ['quil.core'], ['org.processingjs.Processing', 'quil.sketch', 'cljs.core', 'clojure.string', 'quil.util']);
+goog.addDependency("../jellydb/protein.js", ['jellydb.protein'], ['ajax.core', 'jellydb.utilities', 'clojure.browser.repl', 'cljs.core', 'cljs_http.client', 'om.dom', 'cljs.core.async', 'quil.core', 'om.core', 'goog.events']);
+goog.addDependency("../jellydb/proteins.js", ['jellydb.proteins'], ['ajax.core', 'jellydb.utilities', 'clojure.browser.repl', 'cljs.core', 'cljs_http.client', 'om.dom', 'cljs.core.async', 'jellydb.protein', 'om.core', 'goog.events']);
 goog.addDependency("../jellydb/core.js", ['jellydb.core'], ['ajax.core', 'jellydb.utilities', 'jellydb.proteins', 'clojure.browser.repl', 'cljs.core', 'cljs_http.client', 'om.dom', 'cljs.core.async', 'jellydb.protein', 'om.core', 'goog.events']);
 goog.addDependency("../clojure/set.js", ['clojure.set'], ['cljs.core']);
 goog.addDependency("../figwheel/client/utils.js", ['figwheel.client.utils'], ['cljs.core', 'clojure.string']);

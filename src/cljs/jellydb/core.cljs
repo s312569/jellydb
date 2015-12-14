@@ -84,15 +84,15 @@
       (dom/div nil
                (condp = view
                  "home" (om/build home {})
-                 "proteins" (om/build psv/proteins-view data)
-                 "protein" (om/build pv/protein-view data))))))
+                 "proteins" (om/build psv/proteins-view data))))))
 
 (defn outer
   [app owner]
   (om/component
    (dom/div nil
             (dom/div {:id "search"} (om/build search {}))
-            (dom/div {:id "data"} (om/build app-view app)))))
+            (dom/div {:id "data"}
+                     (om/build app-view app)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; main

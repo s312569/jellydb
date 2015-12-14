@@ -5,6 +5,8 @@
             [jellydb.models.ips :as ip]
             [clojure.string :as st]
             [clj-biosequence.core :as bs]
+            [clj-biosequence.interproscan :as ips]
+            [clj-biosequence.blast :as blast]
             [clojure.java.io :as io]
             [taoensso.nippy :as nip]
             [clojure.data.json :as json]
@@ -119,6 +121,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmulti get-biosequence (fn [q] (:table q)))
+(defmulti all-biosequence (fn [q] (:table q)))
 (defmulti row->biosequence (fn [hm] (cond (:id hm)
                                           :contig
                                           (:hash hm)
@@ -164,6 +167,18 @@
               :row-fn row->biosequence
               :result-set-fn first)))
 
+(defmethod all-biosequence :ips
+  [q]
+  (let [qu (str "select * from " (name (:table q)))]
+    (db/query spec qu
+              :row-fn #(->> (row->biosequence %)))))
+
+(defmethod all-biosequence :peps
+  [q]
+  (let [qu (str "select * from " (name (:table q)))]
+    (db/query spec qu
+              :row-fn #(->> (row->biosequence %)))))
+
 (defn query->file
   ([query file] (query->file query file bs/fasta-string))
   ([query file func]
@@ -187,6 +202,14 @@
 
 (defn get-assembly [id]
   (let [q (str "select * from assemblies where id=" id)]
+    (query-db q :result-set-fn first)))
+
+(defn get-submitter [id]
+  (let [q (str "select * from submitters where id=" id)]
+    (query-db q :result-set-fn first)))
+
+(defn get-blasts [id]
+  (let [q (str "select * from submitters where id=" id)]
     (query-db q :result-set-fn first)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -234,27 +257,95 @@
           {:status :success :id id})
       (proteins-key req-ids))))
 
-(defn html-format
-  [s]
-  (->> (partition-all 55 s)
-       (map #(apply str %))
-       (interpose "\n")
-       (apply str)))
+(defn- hm-hash [h id]
+  (let [s (ips/signature (first h))
+        e (ips/entry s)]
+    (if (bs/description s)
+      {:signature (st/lower-case (bs/description s))
+       :intervals (mapcat #(->> (bs/intervals %)
+                                (map (fn [x]
+                                       (vector (bs/start x) (bs/end x)))))
+                          h)
+       :library (ips/library s)
+       :accession (bs/accession s)
+       :type (if e (ips/entry-type e))
+       :name (if e (ips/entry-name e))
+       :go-terms (->> (if e (ips/ips-go-terms e))
+                      (map #(hash-map :go-accession (bs/accession %)
+                                      :component (ips/category %)
+                                      :name (ips/go-name %)))
+                      seq)
+       :pathways (->> (if e (ips/pathways e))
+                      (remove nil?)
+                      (map #(hash-map :path-accession (bs/accession %)
+                                      :name (ips/pathway-name %)
+                                      :db (ips/pathway-database %)))
+                      seq)})))
+
+(defn- fix-gos [ips-data]
+  (let [f (fn [x k ak]
+            (->> (mapcat #(let [i (:intervals %)]
+                            (map (fn [x] (assoc x :intervals i))
+                                 (k %)))
+                         x)
+                 (group-by #(ak %))
+                 vals))
+        g (f ips-data :go-terms :go-accession)
+        p (f ips-data :pathways :path-accession)]
+    {:ips-data (map #(dissoc % :go-terms :pathways) ips-data)
+     :go-terms (map #(assoc (first %) :intervals (mapcat :intervals %))
+                    g)
+     :pathways (map #(assoc (first %) :intervals (mapcat :intervals %))
+                    p)}))
+
+(defn- ips-data [i id]
+  (if-let [h (->> (map #(group-by (fn [x] (-> (ips/signature x) bs/accession))
+                                  %)
+                       (list (ips/hmmer-3-seq i)
+                             (ips/panther-seq i)
+                             (ips/tmhmm-seq i)
+                             (ips/profile-seq i)
+                             (ips/superfamily-seq i)))
+                  (mapcat vals)
+                  (remove #(not (seq %))))]
+    (->> (map #(hm-hash % id) h)
+         (remove nil?)
+         fix-gos)))
 
 (defn get-pep [id]
   (let [s (as-> (select-keys (get-biosequence {:acc id :table :peps})
-                             [:description :sequence :dataset])
+                             [:description :sequence :dataset :acc])
               r
-            (assoc r :sequence (html-format (:sequence r)))
+            (assoc r :sequence (:sequence r))
             (assoc r :mrna (-> (get-biosequence {:table :mrnas :acc id})
-                               :sequence
-                               html-format ))
+                               :sequence))
             (assoc r :cds (-> (get-biosequence {:table :cds :acc id})
-                              :sequence
-                              html-format))
-            (merge r (get-assembly (:dataset r))))]
+                              :sequence))
+            (assoc r :ips (-> (get-biosequence {:table :ips :acc id})
+                              (ips-data id)))
+            (merge r (get-assembly (:dataset r)))
+            (assoc r :submitter (get-submitter (:submitter r)))
+            (assoc r :blasts (->> (get-biosequence {:table :blasts :acc id})
+                                  blast/hit-seq
+                                  (map (fn [x]
+                                         {:hacc (blast/hit-accession x)
+                                          :hdef (blast/hit-def x)
+                                          :bits
+                                          (clojure.pprint/cl-format
+                                           nil
+                                           "~,2e"
+                                           (-> (blast/hit-bit-scores x)
+                                               first))
+                                          :eval
+                                          (clojure.pprint/cl-format
+                                           nil
+                                           "~,2e"
+                                           (-> (blast/hit-e-values x)
+                                               first))})))))]
     {:status "success"
      :protein s}))
+
+;; (get-biosequence {:table :ips :acc "jdb|101|m.9"})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; importing

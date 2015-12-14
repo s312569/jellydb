@@ -7,6 +7,7 @@
             [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
             [cljs-http.client :as http]
+            [jellydb.protein :as p]
             [jellydb.utilities :as jdbu]))
 
 ;; server calls
@@ -70,7 +71,6 @@
         (when-not (= (:data e) :end)
           (>! (:chan e) (om/get-state owner state))
           (recur (<! events)))
-        (jdbu/log (str "Closing " topic " loop"))
         (unsub nc topic c)))))
 
 (defn- protein-loop
@@ -85,7 +85,6 @@
                              ((:data e) (om/get-state owner :start)))
               (serve-proteins owner)
               (recur (<! events)))
-            (jdbu/log "Closing protein loop")
             (unsub nc :nav c)))))
 
 (defn- selected-loop
@@ -101,7 +100,6 @@
                               (fn [x] (-> (remove #(= (:data e) %) x) vec)))
             (om/update-state! owner :selected #(conj % (:data e))))
           (recur (<! events)))
-        (jdbu/log "Closing selected loop")
         (unsub nc :selected c)))))
 
 (defn- export-loop 
@@ -115,7 +113,6 @@
               (get-fasta-key owner)
               (om/set-state! owner :key "")
               (recur (<! events)))
-            (jdbu/log "Closing export loop")
             (unsub nc :export c)))))
 
 ;; components
@@ -143,17 +140,14 @@
        :total 0})
     om/IWillMount
     (will-mount [_]
-      ;;(jdbu/log "Mounting")
       (change-state! owner :pos :start)
       (change-state! owner :total :total))
     om/IWillReceiveProps
     (will-receive-props [_ np]
-      ;;(jdbu/log "Recieving props")
       (change-state! owner :pos :start)
       (change-state! owner :total :total))
     om/IRenderState
     (render-state [_ {:keys [start total]}]
-      ;;(jdbu/log (jdbu/print-state owner))
       (dom/div
        #js {:className "pure-g padded"}
        (dom/div
@@ -188,14 +182,17 @@
   (reify
     om/IInitState
     (init-state [_]
-      {:selected checked})
+      {:selected checked
+       :acc acc
+       :visible "none"})
     om/IWillReceiveProps
     (will-receive-props [_ np]
-      (om/set-state! owner :selected checked))
+      (om/set-state! owner :selected checked)
+      (om/set-state! owner :acc (:acc np)))
     om/IRenderState
-    (render-state [_ {:keys [selected]}]
+    (render-state [_ {:keys [selected visible acc]}]
       (dom/div
-       nil
+       #js {:className "pdisplay"}
        (dom/div
         #js {:className "pure-g"}
         (dom/div
@@ -208,11 +205,7 @@
                            (om/set-state! owner :selected (not selected)))}))
         (dom/div
          #js {:className "pure-u-23-24"}
-         (dom/a #js {:width "100%"
-                     :onClick #(put! (:pub-chan (om/get-shared owner))
-                                     {:topic :view :view "protein"
-                                      :data acc})}
-                description)))
+         description))
        (dom/div
         #js {:className "pure-g"}
         (dom/div
@@ -231,9 +224,8 @@
          "")
         (dom/div
          #js {:className "pure-u-23-24"}
-         (dom/a
-          #js {:href "#"}
-          "Something else")))))))
+         (dom/div nil
+                  (om/build p/protein-view acc))))))))
 
 (defn- init-view-state [owner np]
   (om/set-state! owner :search np)
@@ -269,15 +261,15 @@
       (request-loop owner :total :total))
     om/IWillUnmount
     (will-unmount [_]
-      (jdbu/log "Unmounting")
       (let [pc (:pub-chan (om/get-shared owner))]
         (put! pc {:topic :nav :data :end})
         (put! pc {:topic :selected :data :end})
         (put! pc {:topic :export :data :end})
         (put! pc {:topic :pos :data :end})
-        (put! pc {:topic :total :data :end})))
+        (put! pc {:topic :total :data :end})
+        (put! pc {:topic :display :data :end})))
     om/IRenderState
-    (render-state [_ {:keys [proteins key search]}]
+    (render-state [_ {:keys [proteins key search visible acc]}]
       (dom/div nil
                (dom/iframe #js {:id "downloadframe"
                                 :src (if-not (= key "")

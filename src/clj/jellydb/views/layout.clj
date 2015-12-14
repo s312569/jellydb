@@ -35,7 +35,7 @@
        [:div {:class "header"}
         [:h1 "JellyDB"]
         [:h2 "A jellyfish sequence server"]]
-       [:div {:class "content" :id "t"}
+       [:div {:class "content" :id "t" :overflow "hidden"}
         body]]]
      [:footer {:class "container"}
       [:div {:id "footer-bottom" :class "grid12 first"}
