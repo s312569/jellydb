@@ -9,7 +9,7 @@
                  [postgresql "9.3-1102.jdbc41"]
                  [org.clojure/tools.nrepl "0.2.12"]
                  [org.clojure/java.jdbc "0.4.2"]
-                 [clj-biosequence "0.5.0"]
+                 [clj-biosequence "0.5.1"]
                  [org.clojure/clojure "1.7.0"]
                  [org.clojure/tools.reader "0.10.0"]
                  [org.clojure/clojurescript "1.7.170"]

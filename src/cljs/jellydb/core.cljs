@@ -6,50 +6,13 @@
             [cljs.core.async :refer [put! <! >! chan pub sub]]
             [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
-            [jellydb.proteins :as psv]
-            [jellydb.protein :as pv]
             [jellydb.utilities :as jdbu]
+            [jellydb.blast :refer [blast-view blast-waiting]]
+            [jellydb.search :refer [search]]
+            [jellydb.proteins :refer [proteins-view proteins-reset]]
             [cljs-http.client :as http]))
 
 ;; components
-
-(defn search-submit
-  [owner]
-  (let [text (om/get-state owner :text)]
-    (if-not (= text "")
-      (do (put! (:pub-chan (om/get-shared owner))
-                {:topic :view :view "proteins"
-                 :data text})
-          (om/set-state! owner :text ""))
-      (js/alert "No search entered!"))))
-
-(defn search
-  [app owner]
-  (reify
-    om/IInitState
-    (init-state [_]
-      {:text ""})
-    om/IRenderState
-    (render-state [_ {:keys [text]}]
-      (dom/div
-       #js {:className "pure-g"}
-       (dom/div #js {:className "pure-u-4-5"}
-                (dom/div #js {:className "padded"}
-                         (dom/input
-                          #js {:placeholder "Search for sequences ..."
-                               :className "myinput pure-u-1"
-                               :type "text"
-                               :value text
-                               :onKeyDown #(if (= 13 (.-which %))
-                                             (search-submit owner))
-                               :onChange #(jdbu/change % owner)})))
-       (dom/div #js {:className "pure-u-1-5"}
-                (dom/div #js {:className "padded"}
-                         (dom/button
-                          #js {:className
-                               "pure-button pure-button-primary pure-u-1"
-                               :onClick #(search-submit owner)}
-                          "Go")))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; home
@@ -58,39 +21,53 @@
 (defn home
   [app owner]
   (om/component
-   (dom/div #js {:style #js {:clear "both"}}
-            (dom/p nil "Home"))))
+   (dom/div
+    nil
+    (dom/div {:id "search"} (om/build search {}))
+    (dom/div
+     #js {:style #js {:clear "both"}}
+     (dom/div
+      #js {:className "padded hcenter"}
+      "Welcome to JellyDB containing jellyfish transcriptomic
+      sequences and proteomics data.")
+     (dom/a #js {:onClick #(put! (:pub-chan (om/get-shared owner))
+                                 {:topic :view :view "blast"
+                                  :data nil})}
+            "Blast")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; app control
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defn view-loop
+  [o e]
+  (om/set-state! o :view {:view (:view e) :data (:data e)}))
+
 (defn app-view [app owner]
   (reify
     om/IInitState
     (init-state [_]
-      {:view "home"
-       :data nil})
+      {:view {:view "home" :data nil}})
     om/IDidMount
     (did-mount [_]
-      (let [events (sub (:notif-chan (om/get-shared owner)) :view (chan))]
-        (go
-          (loop [e (<! events)]
-            (om/set-state! owner :view (:view e))
-            (om/set-state! owner :data (:data e))
-            (recur (<! events))))))
+      (jdbu/register-loop owner :view view-loop))
+    om/IWillUnmount
+    (will-unmount [_]
+      (jdbu/unsubscribe owner :view))
     om/IRenderState
-    (render-state [_ {:keys [view data]}]
+    (render-state [_ {:keys [view]}]
       (dom/div nil
-               (condp = view
-                 "home" (om/build home {})
-                 "proteins" (om/build psv/proteins-view data))))))
+               (condp = (:view view)
+                 "home" (om/build home (:data view))
+                 "blast" (om/build blast-view (:data view))
+                 "blast-waiting" (om/build blast-waiting (:data view))
+                 "proteins" (om/build proteins-view (:data view))
+                 "proteins-reset" (om/build proteins-reset (:data view)))))))
 
 (defn outer
   [app owner]
   (om/component
    (dom/div nil
-            (dom/div {:id "search"} (om/build search {}))
             (dom/div {:id "data"}
                      (om/build app-view app)))))
 

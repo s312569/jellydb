@@ -9,12 +9,6 @@
             [jellydb.routes.home :refer [home-routes]]
             [jellydb.routes.proteins :refer [proteins-routes]]))
 
-;; (defroutes app-routes
-;;   (GET  "/" [] (resource-response "index.html" {:root "public"}))
-;;   (GET  "/proteins" [o] (response (db/get-all-proteins 0)))
-;;   (route/resources "/")
-;;   (route/not-found "Page not found"))
-
 (defn init []
   (println "jellydb is starting"))
 
@@ -23,24 +17,33 @@
 
 (defroutes app-routes
   (route/resources "/")
-  (GET  "/proteins" [o]
-        (response (db/get-all-proteins o)))
-  (POST "/id-submit" req
+  (POST  "/proteins" req
+         (let [p (:body req)
+               m (merge p (get @db/req-key-map (:key p)))]
+           (response (db/return-results m))))
+  (POST "/search-key" req
         (let [p (:body req)]
-          (response (db/proteins-key (last p)))))
-  (GET "/peptide" [id]
-       (response (db/get-pep id)))
+          (response (db/get-key p))))
+  (POST "/blast-check" req
+        (let [p (:body req)]
+          (response (db/check-blast p))))
+  (POST "/select-all" req
+        (let [p (:body req)]
+          (response (db/select-all (merge p (get @db/req-key-map (:key p)))))))
+  (POST "/search-info" req
+        (let [p (:body req)]
+          (response (db/search-data (merge p (get @db/req-key-map (:key p)))))))
   (GET "/fetch" [k]
-       (-> (db/fasta-proteins k)
-           response
-           (content-type "application/octet-stream")
-           (header "Content-Disposition" "attachment; filename=sequences.fasta")))
-  (GET "/protein-count" []
-       (response (db/count-query)))
+       (let [m (assoc (get @db/req-key-map k) :id k)]
+         (-> (db/return-file m)
+             response
+             (content-type "application/octet-stream")
+             (header "Content-Disposition"
+                     "attachment; filename=sequences.fasta"))))
   (route/not-found "Not Found"))
 
 (def app
   (-> (routes home-routes app-routes)
-      (middleware/wrap-json-body)
+      (middleware/wrap-json-body {:keywords? true})
       (middleware/wrap-json-response)
       (wrap-defaults (assoc site-defaults :security {:anti-forgery false}))))

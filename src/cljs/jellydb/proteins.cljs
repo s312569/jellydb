@@ -1,9 +1,5 @@
 (ns ^:figwheel-always jellydb.proteins
-  (:require-macros [cljs.core.async.macros :refer [go go-loop alt!]])
-  (:require [goog.events :as events]
-            [ajax.core :refer [GET POST]]
-            [clojure.browser.repl :as repl]
-            [cljs.core.async :refer [put! <! >! chan pub sub close! unsub]]
+  (:require [cljs.core.async :refer [put!]]
             [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
             [cljs-http.client :as http]
@@ -13,123 +9,81 @@
 ;; server calls
 
 (defn- get-fasta-key
-  [owner]
-  (letfn [(h [{:keys [status id msg]}]
+  [owner type]
+  (let [h (fn [{:keys [status id msg]}]
             (if (= "success" status)
-              (om/set-state! owner :key id)
+              (om/set-state! owner :ekey id)
               (js/alert msg)))]
     (if-let [ids (-> (om/get-state owner :selected) seq)]
-      (POST "/id-submit" {:error-handler jdbu/error-handler
-                          :params {:i (vec ids)}
-                          :handler h
-                          :response-format :json
-                          :keywords? true})
+      (jdbu/post-params "/search-key" {:ids (vec ids) :type type} h)
       (h {:status "fail" :msg "No sequences selected."}))))
 
 (defn- serve-proteins
   [owner]
   (let [o (om/get-state owner :start)
-        h (fn [{:keys [status proteins] :as r}]
+        k (om/get-state owner :key)
+        h (fn [{:keys [status proteins]}]
             (if (= "success" status)
               (om/set-state! owner :proteins proteins)
-              (throw (js/Error. "Can not initialise proteins."))))]
-    (GET "/proteins" {:params {:o (- (* 20 o) 20)}
-                      :handler h
-                      :error-handler jdbu/error-handler
-                      :response-format :json
-                      :keywords? true})))
+              (throw (js/Error. "Can not initialise proteins."))))
+        params {:offset (- (* 20 o) 20) :key k}]
+    (jdbu/post-params "/proteins" params h)))
 
-(defn- init-total-proteins
+(defn- search-info
   [owner]
-  (letfn [(h [{:keys [status count] :as r}]
+  (let [k (om/get-state owner :key)
+        t (om/get-state owner :total)
+        h (fn [{:keys [status info]}]
             (if (= "success" status)
-              (om/set-state! owner :total (.ceil js/Math (/ count 20)))
-              (throw (js/Error. "Error in total protein determination."))))]
-    (GET "/protein-count" {:handler h
-                           :error-handler jdbu/error-handler
-                           :response-format :json
-                           :keywords? true})))
+              (om/set-state! owner :search-info info)
+              (throw (js/Error. "Error in retrieving search information."))))]
+    (jdbu/post-params "/search-info" {:key k :total t} h)))
 
-;; loops
-
-(defn change-state!
-  [owner topic state]
-  (let [c (chan)]
-    (go
-      (put! (:pub-chan (om/get-shared owner)) {:topic topic :chan c})
-      (let [v (<! c)]
-        (if-not (= v (om/get-state owner state))
-          (om/set-state! owner state v))))))
-
-(defn request-loop
-  [owner topic state]
-  (let [c (chan)
-        nc (:notif-chan (om/get-shared owner))
-        events (sub nc topic c)]
-    (go
-      (loop [e (<! events)]
-        (when-not (= (:data e) :end)
-          (>! (:chan e) (om/get-state owner state))
-          (recur (<! events)))
-        (unsub nc topic c)))))
-
-(defn- protein-loop
+(defn- select-all
   [owner]
-  (let [c (chan)
-        nc (:notif-chan (om/get-shared owner))
-        events (sub nc :nav c)]
-        (go
-          (loop [e (<! events)]
-            (when-not (= (:data e) :end)
-              (om/set-state! owner :start
-                             ((:data e) (om/get-state owner :start)))
-              (serve-proteins owner)
-              (recur (<! events)))
-            (unsub nc :nav c)))))
+  (let [k (om/get-state owner :key)
+        h (fn [{:keys [status info]}]
+            (if (= "success" status)
+              (let [ds (om/get-state owner :dont-show)
+                    i (remove (set ds) info)]
+                (om/set-state! owner :selected i))
+              (throw (js/Error. "Error in retrieving search information."))))]
+    (jdbu/post-params "/select-all" {:key k} h)))
 
-(defn- selected-loop
+(defn- show-only-selected
   [owner]
-  (let [c (chan)
-        nc (:notif-chan (om/get-shared owner))
-        events (sub nc :selected c)]
-    (go
-      (loop [e (<! events)]
-        (when-not (= (:data e) :end)
-          (if (some #(= (:data e) %) (om/get-state owner :selected))
-            (om/update-state! owner :selected
-                              (fn [x] (-> (remove #(= (:data e) %) x) vec)))
-            (om/update-state! owner :selected #(conj % (:data e))))
-          (recur (<! events)))
-        (unsub nc :selected c)))))
-
-(defn- export-loop 
-  [owner]
-  (let [c (chan)
-        nc (:notif-chan (om/get-shared owner))
-        events (sub nc :export c)]
-        (go
-          (loop [e (<! events)]
-            (when-not (= (:data e) :end)
-              (get-fasta-key owner)
-              (om/set-state! owner :key "")
-              (recur (<! events)))
-            (unsub nc :export c)))))
+  (let [k (om/get-state owner :key)
+        h (fn [{:keys [status info msg]}]
+            (if (= "success" status)
+              (let [s (om/get-state owner :selected)
+                    ds (remove (set s) info)]
+                (om/set-state! owner :dont-show ds)
+                (om/set-state! owner :selected []))
+              (js/alert msg)))]
+    (if-let [ids (-> (om/get-state owner :selected) seq)]
+      (jdbu/post-params "/select-all" {:key k} h)
+      (h {:status "fail" :msg "No sequences selected."}))))
 
 ;; components
 
 (defn- export
   [_ owner]
   (om/component
-   (dom/div
-    #js {:style #js {:float "right"}}
-    (dom/select
-     #js {:style #js {:font-size "85%"}
-          :value ""
-          :className "myinput"
-          :onChange #(jdbu/pub-info owner :export (-> % .-target .-value))}
-     (dom/option #js {:value "" :disabled ""}
-                 "Export selected as ...")
-     (dom/option #js {:value "fasta"} "Fasta")))))
+   (let [r '({:value "placeholder" :name "Other functions"
+              :disabled true}
+             {:value "peps" :name "Export selected sequences as protein"}
+             {:value "cds" :name "Export selected sequences as CDS"}
+             {:value "mrnas" :name "Export selected sequences as mRNA"}
+             {:value "only-selected" :name "Only show selected"})]
+     (dom/div
+      #js {:style #js {:float "right"}}
+      (om/build jdbu/select {:label-func :name
+                             :value-func :value
+                             :selected "placeholder"
+                             :classname "myinput small-text"
+                             :onchange-func
+                             #(jdbu/pub-info owner :export (-> % .-target .-value))
+                             :records r})))))
 
 (defn- nav
   [_ owner]
@@ -140,12 +94,12 @@
        :total 0})
     om/IWillMount
     (will-mount [_]
-      (change-state! owner :pos :start)
-      (change-state! owner :total :total))
+      (jdbu/change-state! owner :pos :start)
+      (jdbu/change-state! owner :total :total :func #(int (Math/ceil (/ % 20)))))
     om/IWillReceiveProps
     (will-receive-props [_ np]
-      (change-state! owner :pos :start)
-      (change-state! owner :total :total))
+      (jdbu/change-state! owner :pos :start)
+      (jdbu/change-state! owner :total :total :func #(int (Math/ceil (/ % 20)))))
     om/IRenderState
     (render-state [_ {:keys [start total]}]
       (dom/div
@@ -178,19 +132,20 @@
        (dom/div #js {:className "pure-u-1-2"}
                 (om/build export nil))))))
 
-(defn- protein [{:keys [acc description sequence checked]} owner]
+(defn- protein [protein owner]
   (reify
     om/IInitState
     (init-state [_]
-      {:selected checked
-       :acc acc
+      {:protein protein
+       :selected (:checked protein)
        :visible "none"})
     om/IWillReceiveProps
     (will-receive-props [_ np]
-      (om/set-state! owner :selected checked)
-      (om/set-state! owner :acc (:acc np)))
+      (om/set-state! owner :selected (:checked np))
+      (om/set-state! owner :protein np)
+      (om/set-state! owner :visible "none"))
     om/IRenderState
-    (render-state [_ {:keys [selected visible acc]}]
+    (render-state [_ {:keys [selected visible acc protein]}]
       (dom/div
        #js {:className "pdisplay"}
        (dom/div
@@ -199,13 +154,13 @@
          #js {:className "pure-u-1-24"}
          (dom/input
           #js {:type "checkbox"
-               :checked checked
+               :checked selected
                :onChange (fn [_]
-                           (jdbu/pub-info owner :selected acc)
+                           (jdbu/pub-info owner :selected (:acc protein))
                            (om/set-state! owner :selected (not selected)))}))
         (dom/div
          #js {:className "pure-u-23-24"}
-         description))
+         (str (:acc protein) " - " (:description protein))))
        (dom/div
         #js {:className "pure-g"}
         (dom/div
@@ -213,7 +168,7 @@
          "")
         (dom/div
          #js {:className "pure-u-5-24 protsumm"}
-         (str (count sequence) " amino acid protein"))
+         (str (count (:sequence protein)) " amino acid protein"))
         (dom/div
          #js {:className "pure-u-18-24 protsumm"}
          (str "JellyDB accession: " acc)))
@@ -225,15 +180,42 @@
         (dom/div
          #js {:className "pure-u-23-24"}
          (dom/div nil
-                  (om/build p/protein-view acc))))))))
+                  (om/build p/protein-view protein))))))))
 
-(defn- init-view-state [owner np]
-  (om/set-state! owner :search np)
-  (om/set-state! owner :start 1)
-  (om/set-state! owner :selected [])
-  (om/set-state! owner :key "")
-  (init-total-proteins owner)
-  (serve-proteins owner))
+(defn select-all-none
+  [{:keys [count all]} owner]
+  (reify
+    om/IInitState
+    (init-state [_]
+      {:selected :none})
+    om/IWillReceiveProps
+    (will-receive-props [_ {:keys [count all]}]
+      (cond (= count 0)
+            (om/set-state! owner :selected :none)
+            (= count all)
+            (om/set-state! owner :selected :all)
+            (> count 0)
+            (om/set-state! owner :selected :both)))
+    om/IRenderState
+    (render-state [_ {:keys [selected]}]
+      (dom/div
+       #js {:className "tbpadded"}
+       "Select: "
+       (dom/a #js {:onClick
+                   #(do (jdbu/pub-info owner :all-none :all)
+                        (om/set-state! owner :selected :all))
+                   :className (if (= selected :all)
+                                "flinki" "flinka")}
+              "All")
+       " | "
+       (dom/a #js {:onClick
+                   #(do (jdbu/pub-info owner :all-none :none)
+                        (om/set-state! owner :selected :none))
+                   :className (if (= selected :none)
+                                "flinki" "flinka")}
+              "None")))))
+
+;; loops
 
 (defn- checked? [p owner]
   (assoc p :checked
@@ -241,45 +223,102 @@
                    (om/get-state owner :selected))
            true false)))
 
-(defn proteins-view [search owner]
+(defn protein-serve
+  [owner e]
+  (om/set-state! owner :start
+                 ((:data e)
+                  (om/get-state owner :start)))
+  (serve-proteins owner))
+
+(defn selected-loop
+  [owner e]
+  (if (some #(= (:data e) %) (om/get-state owner :selected))
+    (om/update-state! owner :selected
+                      (fn [x] (-> (remove #(= (:data e) %) x) vec)))
+    (om/update-state! owner :selected #(conj % (:data e)))))
+
+(defn export-loop
+  [owner e]
+  (condp = (:data e)
+    "only-selected" (show-only-selected owner)
+    (do (get-fasta-key owner (:data e))
+        (om/set-state! owner :ekey ""))))
+
+(defn all-none-loop
+  [owner e]
+  (condp = (:data e)
+    :all (select-all owner)
+    :none (om/set-state! owner :selected [])))
+
+(defn- shown?
+  [owner p]
+  (let [ds (om/get-state owner :dont-show)
+        pid (:acc p)]
+    (not (some #{pid} ds))))
+
+(defn proteins-view [{:keys [key total]} owner]
   (reify
     om/IInitState
     (init-state [_]
       {:start 1
-       :total 0
+       :total total
        :proteins nil
+       :dont-show []
        :selected []
-       :search nil
-       :key ""})
+       :key key
+       :ekey ""
+       :search-info nil})
     om/IWillMount
     (will-mount [_]
-      (init-view-state owner search)
-      (protein-loop owner)
-      (export-loop owner)
-      (selected-loop owner)
-      (request-loop owner :pos :start)
-      (request-loop owner :total :total))
+      (serve-proteins owner)
+      (search-info owner)
+      (jdbu/register-loop owner :nav protein-serve)
+      (jdbu/register-loop owner :export export-loop)
+      (jdbu/register-loop owner :selected selected-loop)
+      (jdbu/register-loop owner :pos (fn [o e]
+                                       (jdbu/put-state o e :start)))
+      (jdbu/register-loop owner :total (fn [o e]
+                                         (jdbu/put-state o e :total)))
+      (jdbu/register-loop owner :all-none all-none-loop))
     om/IWillUnmount
     (will-unmount [_]
-      (let [pc (:pub-chan (om/get-shared owner))]
-        (put! pc {:topic :nav :data :end})
-        (put! pc {:topic :selected :data :end})
-        (put! pc {:topic :export :data :end})
-        (put! pc {:topic :pos :data :end})
-        (put! pc {:topic :total :data :end})
-        (put! pc {:topic :display :data :end})))
+      (jdbu/unsubscribe owner :nav :selected :export :pos :total :all-none))
     om/IRenderState
-    (render-state [_ {:keys [proteins key search visible acc]}]
-      (dom/div nil
-               (dom/iframe #js {:id "downloadframe"
-                                :src (if-not (= key "")
-                                       (str "/fetch?k=" key)
-                                       "")})
-               (dom/div
-                #js {:className "thick padded"}
-                (str "Showing results matching \"" search "\"."))
-               (om/build nav nil)
-               (apply dom/div #js {:className "padded"}
-                      (om/build-all protein
-                                    (map #(checked? % owner) proteins)))
-               (om/build nav nil)))))
+    (render-state [_ {:keys [proteins total selected ekey search-info]}]
+      (if (< 0 total)
+        (dom/div
+         nil
+         (dom/iframe #js {:id "downloadframe"
+                          :src (if-not (= ekey "")
+                                 (do (jdbu/log ekey)
+                                     (str "/fetch?k=" ekey))
+                                 "")})
+         (dom/div #js {:className "thick padded"} search-info)
+         (om/build nav nil)
+         (om/build select-all-none {:count (count selected) :all total})
+         (apply dom/div #js {:className "padded"}
+                (om/build-all protein
+                              (->> (filter #(shown? owner %) proteins)
+                                   (map #(checked? % owner)))))
+         (om/build nav nil))
+        (dom/div
+         nil
+         (dom/div #js {:className "thick padded"} search-info)
+         (dom/div
+          #js {:className "pure-form pure-form-stacked"}
+          (dom/div #js {:className "padded"}
+                   (dom/button
+                    #js {:className
+                         "pure-button pure-button-primary pure-u-1"
+                         :onClick
+                         #(jdbu/pub-info owner :view nil "blast")}
+                    "New search"))))))))
+
+(defn proteins-reset [k owner]
+  (reify
+    om/IDidMount
+    (did-mount [_]
+      (jdbu/pub-info owner :view k "proteins"))
+    om/IRenderState
+    (render-state [_ state]
+      (dom/div nil ""))))

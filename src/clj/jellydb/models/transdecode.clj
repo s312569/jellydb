@@ -9,13 +9,13 @@
   [f d]
   (and (let [res @(sh/sh ["TransDecoder.LongOrfs" "-t" f]
                          {:dir d})]
-         (if (and (= 0 (:exit res)))
+         (if (= 0 (:exit res))
            true
            (throw (Exception. (str "Exception: "
                                    (:err res))))))
        (let [res @(sh/sh ["TransDecoder.Predict" "-t" f]
                          {:dir d})]
-         (if (and (= 0 (:exit res)))
+         (if (= 0 (:exit res))
            true
            (throw (Exception. (str "Exception: "
                                    (:err res)))))))

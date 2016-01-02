@@ -48,6 +48,9 @@ input.pagination {
 	 cursor: pointer;}
 .flinki {color: #cad2d3;}
 .inline {display: inline}
+.my-cursor {cursor: pointer;}
+.my-text {cursor: text;}
+.small-text{font-size: 85%}
 
 /* search box */
 

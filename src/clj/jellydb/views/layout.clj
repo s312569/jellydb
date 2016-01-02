@@ -12,7 +12,8 @@
     [:title "JellyDB"]
     (include-css "/css/layout.css")
     (include-css "/css/proteins.css")
-    (include-css "/css/buttons.css")]
+    (include-css "/css/buttons.css")
+    (include-css "/css/loader.css")]
     [:body
      [:div {:id "layout"}
       [:a {:href "#menu" :id "menuLink" :class "menu-link"}
