@@ -26,26 +26,21 @@
   (str (fs/absolute-path (io/resource "blast"))
        "/"))
 
+(defn- all-to-file
+  [table file]
+  (ut/all-biosequence {:table table :func #(bs/biosequence->file % file :append false)}))
+
 (def dbs {:sp {:path (str (blast-path) "swissprot")
-               :db #(bl/init-blast-db (str (blast-path) "swissprot")
-                                      :iupacAminoAcids)
-               :type :iupacAminoAcids
-               :query nil}
+               :type :iupacAminoAcids}
           :jdb-prot {:path (str (blast-path) "jdb-prot")
-                     :db #(bl/init-blast-db (str (blast-path) "jdb-prot")
-                                            :iupacAminoAcids)
-                     :type :iupacAminoAcids
-                     :query "select * from peps"}
+                     :generate :peps
+                     :type :iupacAminoAcids}
           :jdb-cds {:path (str (blast-path) "jdb-cds")
-                    :db #(bl/init-blast-db (str (blast-path) "jdb-cds")
-                                           :iupacAminoAcids)
-                    :type :iupacNucleicAcids
-                    :query "select * from cds"}
+                    :generate :cds
+                    :type :iupacNucleicAcids}
           :jdb-mrna {:path (str (blast-path) "jdb-mrna")
-                     :db #(bl/init-blast-db (str (blast-path) "jdb-mrna")
-                                            :iupacAminoAcids)
-                     :type :iupacNucleicAcids
-                     :query "select * from mrnas"}})
+                     :generate :mrnas
+                     :type :iupacNucleicAcids}})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; generate blast dbs
@@ -73,8 +68,9 @@
   []
   (delete-indexes)
   (doseq [db (vals dbs)]
-    (if (:query db)
-      (ut/query->file (:query db) (:path db)))
+    (if (:generate db)
+      (ut/all-biosequence {:table (:generate db)
+                           :func #(bs/biosequence->file % (:path db) :append false)}))
     (run-makeblastdb (:path db) (if (= :iupacAminoAcids (:type db))
                                   "prot" "nucl"))))
 
@@ -84,17 +80,20 @@
 
 (defn run-blast
   [bs program db params]
-  (let [f (blast-out-file)]
-    (future (bl/blast bs program ((:db ((keyword db) dbs))) f :params params))))
+  (let [f (blast-out-file)
+        database (db dbs)]
+    (future (bl/blast bs program (bl/init-blast-db (:path database) (:type database))
+                      f :params params))))
 
 (defn blast-sequences
   [f db]
-  (let [c (atom 0)]
+  (let [c (atom 0)
+        database (db dbs)]
     (with-open [r (-> (bs/init-fasta-file f :iupacAminoAcids)
                       bs/bs-reader)]
       (-> (pmap #(bl/blast %
                            "blastp"
-                           (db dbs)
+                           (bl/init-blast-db (:path database) (:type database))
                            (str f "-blast.out-" (swap! c inc)))
                 (partition-all 10000 (bs/biosequence-seq r)))
           (bs/index-combine-files (str f "-blast-combined"))))))

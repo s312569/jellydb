@@ -20,6 +20,7 @@
   (POST  "/proteins" req
          (let [p (:body req)
                m (merge p (get @db/req-key-map (:key p)))]
+           (println m)
            (response (db/return-results m))))
   (POST "/search-key" req
         (let [p (:body req)]

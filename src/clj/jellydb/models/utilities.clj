@@ -51,6 +51,18 @@
                                 :acc
                                 (str (:id hm)))))
 
+(defn- pep->mrna
+  [m]
+  (->> (-> (select-keys m [:acc :dataset :description :alphabet])
+           (assoc :sequence (:mrna m)))
+       row->biosequence))
+
+(defn- pep->cds
+  [m]
+  (->> (-> (select-keys m [:acc :dataset :description :alphabet])
+           (assoc :sequence (:cds m)))
+       row->biosequence))
+
 (defmulti get-biosequence (fn [q] (:table q)))
 
 (defmethod get-biosequence :contigs
@@ -68,6 +80,20 @@
               :row-fn row->biosequence
               :result-set-fn first)))
 
+(defmethod get-biosequence :cds
+  [q]
+  (let [qu (str "select * from " (name (:table q)) "  where acc='" (:acc q) "'")]
+    (db/query spec qu
+              :row-fn pep->cds
+              :result-set-fn first)))
+
+(defmethod get-biosequence :mrnas
+  [q]
+  (let [qu (str "select * from " (name (:table q)) "  where acc='" (:acc q) "'")]
+    (db/query spec qu
+              :row-fn pep->mrna
+              :result-set-fn first)))
+
 (defmethod get-biosequence :default
   [q]
   (let [qu (str "select * from " (name (:table q)) "  where acc='" (:acc q) "'")]
@@ -77,28 +103,30 @@
 
 (defmulti all-biosequence (fn [q] (:table q)))
 
-(defmethod all-biosequence :ips
-  [q]
-  (let [qu (str "select * from " (name (:table q)))]
+(defmethod all-biosequence :default
+  [{:keys [table func] :or {table nil func identity}}]
+  (let [qu (str "select * from " (name table))]
     (db/query spec qu
-              :row-fn #(->> (row->biosequence %)))))
+              :row-fn row->biosequence
+              :result-set-fn func)))
 
-(defmethod all-biosequence :peps
-  [q]
-  (let [qu (str "select * from " (name (:table q)))]
+(defmethod all-biosequence :cds
+  [{:keys [table func] :or {table nil func identity}}]
+  (let [qu (str "select * from peps")]
     (db/query spec qu
-              :row-fn #(->> (row->biosequence %)))))
+              :row-fn pep->cds
+              :result-set-fn func)))
 
-(defn query->file
-  ([query file] (query->file query file bs/fasta-string))
-  ([query file func]
-   (with-open [w (io/writer file)]
-     (db/query spec query
-               :row-fn #(as-> (row->biosequence %)
-                            r
-                          (bs/fasta-string r)
-                          (.write w (str r "\n")))))
-   file))
+(defmethod all-biosequence :mrnas
+  [{:keys [table func] :or {table nil func identity}}]
+  (let [qu (str "select * from peps")]
+    (db/query spec qu
+              :row-fn pep->mrna
+              :result-set-fn func)))
+
+(defn update-db
+  [table m v]
+  (db/update! spec table m v))
 
 (defn query-db
   [q & rest]

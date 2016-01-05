@@ -5,14 +5,12 @@
             [jellydb.models.ips :as ip]
             [jellydb.models.db :as jdb]
             [jellydb.models.utilities :as ut]
-            [clojure.string :as st]
+            [clojure.string :refer [replace split trim]]
             [clj-biosequence.core :as bs]
             [clj-biosequence.interproscan :as ips]
             [clj-biosequence.blast :as blast]
             [clojure.java.io :as io]
             [taoensso.nippy :as nip]
-            [clojure.data.json :as json]
-            [clojure.edn :as edn]
             [fs.core :as fs]
             [jdbc.pool.c3p0 :as pool])
   (:import [org.apache.commons.codec.binary Base64]
@@ -34,6 +32,8 @@
 
 (defn temp-directory
   [did prefix]
+  (if-not (fs/exists? working-directory)
+    (throw (Exception. (str "Working directory does not exist (" working-directory ")."))))
   (let [p (str working-directory prefix "-" did "-" (ut/new-uuid))]
     (if (and (not (fs/directory? p))
              (fs/mkdir p))
@@ -101,41 +101,36 @@
                                              did)
                                      coll))))
 
-(defn- save-file
-  [f did table]
-  (with-open [r (bs/bs-reader f)]
-    (insert-coll table did
-                 (map #(assoc % :acc
-                              (-> (st/replace (bs/accession %)
-                                              #"\."
-                                              "")
-                                  (st/replace #"\|" "")))
-                      (bs/biosequence-seq r)))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; importing
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- expand-init
   [did f]
-  (save-file (bs/init-fasta-file (str f ".transdecoder.pep")
-                                 :iupacAminoAcids)
-             did
-             :peps)
-  (save-file (bs/init-fasta-file (str f ".transdecoder.mRNA")
-                                 :iupacNucleicAcids)
-             did
-             :mrnas)
-  (save-file (bs/init-fasta-file (str f ".transdecoder.cds")
-                                 :iupacNucleicAcids)
-             did
-             :cds))
+  (letfn [(fix-id [i]
+            (-> (replace i #"\." "")
+                (replace #"\|" "")))
+          (import-seqs [file field]
+            (with-open [r (-> (bs/init-fasta-file file :iupacNucleicAcids)
+                              bs/bs-reader)]
+              (doall (->> (bs/biosequence-seq r)
+                          (map #(ut/update-db :peps {field (:sequence %)}
+                                              ["acc=?" (fix-id (bs/accession %))]))))))
+          (save-file [f did table]
+            (with-open [r (bs/bs-reader f)]
+              (insert-coll table did
+                           (map #(assoc % :acc (fix-id (bs/accession %)))
+                                (bs/biosequence-seq r)))))]
+    (save-file (bs/init-fasta-file (str f ".transdecoder.pep") :iupacAminoAcids) did :peps)
+    (import-seqs (str f ".transdecoder.mRNA") :mrna)
+    (import-seqs (str f ".transdecoder.cds") :cds)))
 
 (defn- extract-cds
   [did]
   (let [d (temp-directory did "decode")
-        f (jdb/query->file (str "select * from contigs where dataset=" did)
-                           (temp-file d "contigs"))]
+        f (ut/all-biosequence {:table :contigs
+                               :func #(bs/biosequence->file % (temp-file d "contigs")
+                                                            :append false)})]
     (try
       (->> (td/predict f d)
            (expand-init did))
@@ -143,15 +138,15 @@
         (fs/delete-dir d)
         (throw e))
       (finally
-        (fs/delete-dir d)
-        ))))
+        (fs/delete-dir d)))))
 
 (defn- blast-peps
   [did]
   (let [d (temp-directory did "blast")
-        b (-> (jdb/query->file (str "select * from peps where dataset=" did)
-                           (temp-file d "peps"))
-              (bl/blast-sequences ))]
+        b (-> (ut/all-biosequence {:table :peps
+                                   :func #(bs/biosequence->file % (temp-file d "peps")
+                                                                :append false)})
+              (bl/blast-sequences :sp))]
     (try
       (with-open [r (bs/bs-reader b)]
         (insert-coll :blasts did (bs/biosequence-seq r)))
@@ -161,14 +156,33 @@
       (finally
         (fs/delete-dir d)))))
 
+(defn- update-descriptions
+  [did]
+  (letfn [(update-pep [bl]
+            (if-let [h (-> (blast/hit-seq bl) first)]
+              (if (and (-> (blast/hit-bit-scores h) first)
+                       (< 50.0 (-> (blast/hit-bit-scores h) first)))
+                (ut/update-db :peps
+                              {:description
+                               (str "Similar to "
+                                    (-> (blast/hit-def h) (split #"OS=") first trim))}
+                              ["acc = ?" (bs/accession bl)]))))]
+    (ut/query-db (str "select blasts.acc, blasts.time,blasts.hash from blasts,peps where blasts.acc=peps.acc and peps.dataset=" did)
+                 :row-fn ut/row->biosequence
+                 :result-set-fn #(doall (map update-pep %)))))
+
 (defn- ips-peps
   [did]
   (let [d (temp-directory did "ips")
-        ip (-> (jdb/query->file (str "select * from peps where dataset=" did)
-                                (temp-file d "ips")
-                                #(-> (assoc % :sequence
-                                            (st/replace (:sequence %) #"\*" ""))
-                                     bs/fasta-string))
+        ip (-> (ut/all-biosequence {:table :peps
+                                    :func (fn [x]
+                                            (bs/biosequence->file
+                                             (map #(-> (assoc % :sequence
+                                                              (replace (:sequence %)
+                                                                       #"\*" "")))
+                                                  x)
+                                             (temp-file d "ips")
+                                             :append false))})
                ip/ips-sequences)]
     (try
       (with-open [r (bs/bs-reader ip)]
@@ -192,6 +206,7 @@
              (insert-coll :contigs did)))
       (extract-cds did)
       (blast-peps did)
+      (update-descriptions did)
       (ips-peps did))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -224,28 +239,14 @@
                       [:pmid :integer "NOT NULL"]))
   (db/db-do-commands spec
                      (db/create-table-ddl
-                      :mrnas
-                      [:acc :varchar "PRIMARY KEY"]
-                      [:dataset :integer "NOT NULL"]
-                      [:description :text]
-                      [:alphabet :varchar "NOT NULL"]
-                      [:sequence :text "NOT NULL"]))
-  (db/db-do-commands spec
-                     (db/create-table-ddl
-                      :cds
-                      [:acc :varchar "PRIMARY KEY"]
-                      [:dataset :integer "NOT NULL"]
-                      [:description :text]
-                      [:alphabet :varchar "NOT NULL"]
-                      [:sequence :text "NOT NULL"]))
-  (db/db-do-commands spec
-                     (db/create-table-ddl
                       :peps
                       [:acc :varchar "PRIMARY KEY"]
                       [:dataset :integer "NOT NULL"]
                       [:description :text]
                       [:alphabet :varchar "NOT NULL"]
-                      [:sequence :text "NOT NULL"]))
+                      [:sequence :text "NOT NULL"]
+                      [:mrna :text]
+                      [:cds :text]))
   (db/db-do-commands spec
                      (db/create-table-ddl
                       :contigs
@@ -277,7 +278,7 @@
        '(:pmids :assemblies :submitters :mrnas :cds :peps :contigs
          :blasts :ips)))
 
-;; (import-assembled-fasta "/home/jason/Dropbox/jellydb/resources/test-data/Trinity.fasta"
+;; (import-assembled-fasta "/home/jason/Dropbox/jellydb/resources/test-data/test.fasta"
 ;;                               :submitter {:first "Jason"
 ;;                                           :last "Mulvenna"
 ;;                                           :email "jason.mulvenna@gmail.com"
@@ -286,3 +287,13 @@
 ;;                                         :abstract "Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test "
 ;;                                         :pmid '(12 12 12)
 ;;                                         :species "S. pecies"})
+
+;; (import-assembled-fasta "/home/jason/Dropbox/jellydb/resources/test-data/chironex.fasta"
+;;                               :submitter {:first "Jason"
+;;                                           :last "Mulvenna"
+;;                                           :email "jason.mulvenna@gmail.com"
+;;                                           :address "QIMR Berghofer"}
+;;                               :dataset {:name "Tentacle transcriptome and proteome of the box jellyfish"
+;;                                         :abstract "The box jellyfish, Chironex fleckeri, is the largest and most dangerous cubozoan jellyfish to humans. It produces potent and rapid-acting venom and its sting causes severe localized and systemic effects that are potentially life-threatening. In this study, a combined transcriptomic and proteomic approach was used to identify C. fleckeri proteins that elicit toxic effects in envenoming. More than 40,000,000 Illumina reads were used to de novo assemble ∼ 34,000 contiguous cDNA sequences and ∼ 20,000 proteins were predicted based on homology searches, protein motifs, gene ontology and biological pathway mapping. More than 170 potential toxin proteins were identified from the transcriptome on the basis of homology to known toxins in publicly available sequence databases. MS/MS analysis of C. fleckeri venom identified over 250 proteins, including a subset of the toxins predicted from analysis of the transcriptome. Potential toxins identified using MS/MS included metalloproteinases, an alpha-macroglobulin domain containing protein, two CRISP proteins and a turripeptide-like protease inhibitor. Nine novel examples of a taxonomically restricted family of potent cnidarian pore-forming toxins were also identified. Members of this toxin family are potently haemolytic and cause pain, inflammation, dermonecrosis, cardiovascular collapse and death in experimental animals, suggesting that these toxins are responsible for many of the symptoms of C. fleckeri envenomation. This study provides the first overview of a box jellyfish transcriptome which, coupled with venom proteomics data, enhances our current understanding of box jellyfish venom composition and the molecular structure and function of cnidarian toxins. The generated data represent a useful resource to guide future comparative studies, novel protein/peptide discovery and the development of more effective treatments for jellyfish stings in humans."
+;;                                         :pmid '(26014501)
+;;                                         :species "Chironex fleckeri"})

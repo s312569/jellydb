@@ -12,3 +12,6 @@ resources/blast/
 figwheel_server.log
 resources/public/js/out/
 
+resources/test-data/chironex.fasta
+resources/working/
+temp

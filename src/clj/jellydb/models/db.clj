@@ -83,13 +83,9 @@
 
 (defn get-pep [id]
   (let [s (as-> (select-keys (ut/get-biosequence {:acc id :table :peps})
-                             [:description :sequence :dataset :acc])
+                             [:description :sequence :dataset :acc :mrna :cds])
               r
             (assoc r :sequence (:sequence r))
-            (assoc r :mrna (-> (ut/get-biosequence {:table :mrnas :acc id})
-                               :sequence))
-            (assoc r :cds (-> (ut/get-biosequence {:table :cds :acc id})
-                              :sequence))
             (assoc r :ips (-> (ut/get-biosequence {:table :ips :acc id})
                               (ips-data id)))
             (merge r (get-assembly (:dataset r)))

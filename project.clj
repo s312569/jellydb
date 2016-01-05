@@ -17,6 +17,7 @@
                  [cljs-http "0.1.37"]
                  [org.clojure/data.json "0.2.6"]
                  [quil "2.2.6"]
+                 [me.raynes/fs "1.4.6"]
                  [cljs-ajax "0.5.1"]
                  [hiccup "1.0.5"]
                  [om "0.7.3"]
