@@ -31,6 +31,7 @@ goog.addDependency("../no/en/core.js", ['no.en.core'], ['cljs.core', 'goog.crypt
 goog.addDependency("../cljs_http/util.js", ['cljs_http.util'], ['no.en.core', 'goog.Uri', 'cljs.core', 'goog.userAgent', 'cognitect.transit', 'clojure.string']);
 goog.addDependency("../cljs_http/core.js", ['cljs_http.core'], ['goog.net.Jsonp', 'goog.net.XhrIo', 'cljs.core', 'cljs_http.util', 'cljs.core.async', 'goog.net.EventType', 'clojure.string', 'goog.net.ErrorCode']);
 goog.addDependency("../cljs_http/client.js", ['cljs_http.client'], ['cljs_http.core', 'no.en.core', 'goog.Uri', 'cljs.core', 'cljs_http.util', 'cljs.core.async', 'clojure.string', 'cljs.reader']);
+goog.addDependency("../jellydb/search.js", ['jellydb.search'], ['jellydb.utilities', 'cljs.core', 'om.dom', 'om.core', 'clojure.string']);
 goog.addDependency("../jellydb/sequence_views.js", ['jellydb.sequence_views'], ['cljs.core', 'om.dom', 'om.core']);
 goog.addDependency("../jellydb/blast_view.js", ['jellydb.blast_view'], ['jellydb.utilities', 'cljs.core', 'om.dom', 'om.core', 'clojure.string']);
 goog.addDependency("../jellydb/dataset_view.js", ['jellydb.dataset_view'], ['jellydb.utilities', 'cljs.core', 'om.dom', 'om.core']);
@@ -42,14 +43,16 @@ goog.addDependency("../quil/core.js", ['quil.core'], ['org.processingjs.Processi
 goog.addDependency("../jellydb/annotation_view.js", ['jellydb.annotation_view'], ['cljs.core', 'om.dom', 'quil.core', 'om.core']);
 goog.addDependency("../jellydb/homology.js", ['jellydb.homology'], ['cljs.core', 'om.dom', 'om.core']);
 goog.addDependency("../jellydb/protein.js", ['jellydb.protein'], ['jellydb.sequence_views', 'jellydb.utilities', 'jellydb.blast_view', 'cljs.core', 'om.dom', 'jellydb.dataset_view', 'jellydb.annotation_view', 'om.core', 'jellydb.homology']);
-goog.addDependency("../jellydb/proteins.js", ['jellydb.proteins'], ['jellydb.utilities', 'cljs.core', 'cljs_http.client', 'om.dom', 'cljs.core.async', 'jellydb.protein', 'om.core']);
+goog.addDependency("../jellydb/proteins.js", ['jellydb.proteins'], ['jellydb.utilities', 'cljs.core', 'cljs_http.client', 'om.dom', 'cljs.core.async', 'jellydb.search', 'jellydb.protein', 'om.core']);
 goog.addDependency("../clojure/browser/event.js", ['clojure.browser.event'], ['cljs.core', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.events']);
 goog.addDependency("../clojure/browser/net.js", ['clojure.browser.net'], ['goog.net.xpc.CfgFields', 'goog.net.XhrIo', 'goog.json', 'goog.Uri', 'cljs.core', 'goog.net.EventType', 'goog.net.xpc.CrossPageChannel', 'goog.net.WebSocket', 'clojure.browser.event']);
 goog.addDependency("../cljs/repl.js", ['cljs.repl'], ['cljs.core']);
 goog.addDependency("../clojure/browser/repl.js", ['clojure.browser.repl'], ['goog.dom', 'goog.userAgent.product', 'cljs.core', 'goog.object', 'clojure.browser.net', 'cljs.repl', 'goog.array', 'clojure.browser.event']);
-goog.addDependency("../jellydb/search.js", ['jellydb.search'], ['ajax.core', 'jellydb.utilities', 'jellydb.proteins', 'cljs.core', 'om.dom', 'cljs.core.async', 'om.core', 'clojure.string']);
+goog.addDependency("../jellydb/links.js", ['jellydb.links'], ['jellydb.utilities', 'cljs.core', 'om.dom', 'om.core']);
 goog.addDependency("../jellydb/blast.js", ['jellydb.blast'], ['jellydb.utilities', 'jellydb.proteins', 'cljs.core', 'om.dom', 'cljs.core.async', 'om.core', 'clojure.string']);
-goog.addDependency("../jellydb/core.js", ['jellydb.core'], ['ajax.core', 'jellydb.utilities', 'jellydb.proteins', 'clojure.browser.repl', 'cljs.core', 'cljs_http.client', 'om.dom', 'cljs.core.async', 'jellydb.search', 'jellydb.blast', 'om.core', 'goog.events']);
+goog.addDependency("../jellydb/contact.js", ['jellydb.contact'], ['jellydb.utilities', 'cljs.core', 'cljs_http.client', 'om.dom', 'om.core']);
+goog.addDependency("../jellydb/datasets.js", ['jellydb.datasets'], ['jellydb.utilities', 'cljs.core', 'cljs_http.client', 'om.dom', 'om.core']);
+goog.addDependency("../jellydb/core.js", ['jellydb.core'], ['ajax.core', 'jellydb.utilities', 'jellydb.proteins', 'clojure.browser.repl', 'cljs.core', 'cljs_http.client', 'om.dom', 'jellydb.links', 'cljs.core.async', 'jellydb.search', 'jellydb.blast', 'om.core', 'goog.events', 'jellydb.contact', 'jellydb.datasets']);
 goog.addDependency("../clojure/set.js", ['clojure.set'], ['cljs.core']);
 goog.addDependency("../figwheel/client/utils.js", ['figwheel.client.utils'], ['cljs.core', 'clojure.string']);
 goog.addDependency("../figwheel/client/file_reloading.js", ['figwheel.client.file_reloading'], ['goog.string', 'goog.net.jsloader', 'goog.Uri', 'cljs.core', 'goog.object', 'cljs.core.async', 'clojure.set', 'figwheel.client.utils', 'clojure.string']);

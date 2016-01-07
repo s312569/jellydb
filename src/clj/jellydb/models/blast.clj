@@ -81,7 +81,7 @@
 (defn run-blast
   [bs program db params]
   (let [f (blast-out-file)
-        database (db dbs)]
+        database ((keyword db) dbs)]
     (future (bl/blast bs program (bl/init-blast-db (:path database) (:type database))
                       f :params params))))
 

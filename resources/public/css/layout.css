@@ -54,7 +54,7 @@ The content `<div>` is where all your content goes.
      margin: 0;
      color: #333;
      text-align: center;
-     padding: 2.5em 2em 0;
+     padding: 0em 2em 0;
      border-bottom: 1px solid #eee;
  }
     .header h1 {
@@ -219,7 +219,7 @@ Hides the menu at `48em`, but modify this based on your app's needs.
     }
 
     #layout {
-        padding-left: 150px; /* left col width "#menu" */
+        padding-left: 0px; /* left col width "#menu" */
         left: 0;
     }
     #menu {

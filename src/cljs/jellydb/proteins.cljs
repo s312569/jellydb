@@ -4,15 +4,27 @@
             [om.dom :as dom :include-macros true]
             [cljs-http.client :as http]
             [jellydb.protein :as p]
+            [jellydb.search :refer [search]]
             [jellydb.utilities :as jdbu]))
 
 ;; server calls
 
-(defn- get-fasta-key
+(defn- get-export-key
   [owner type]
   (let [h (fn [{:keys [status id msg]}]
             (if (= "success" status)
               (om/set-state! owner :ekey id)
+              (js/alert msg)))]
+    (if-let [ids (-> (om/get-state owner :selected) seq)]
+      (jdbu/post-params "/search-key" {:ids (vec ids) :type type} h)
+      (h {:status "fail" :msg "No sequences selected."}))))
+
+(defn- get-fasta-key
+  [owner type]
+  (let [h (fn [{:keys [status count id msg]}]
+            (if (= "success" status)
+              (do (om/set-state! owner :total count)
+                  (om/set-state! owner :key id))
               (js/alert msg)))]
     (if-let [ids (-> (om/get-state owner :selected) seq)]
       (jdbu/post-params "/search-key" {:ids (vec ids) :type type} h)
@@ -49,20 +61,6 @@
                 (om/set-state! owner :selected i))
               (throw (js/Error. "Error in retrieving search information."))))]
     (jdbu/post-params "/select-all" {:key k} h)))
-
-(defn- show-only-selected
-  [owner]
-  (let [k (om/get-state owner :key)
-        h (fn [{:keys [status info msg]}]
-            (if (= "success" status)
-              (let [s (om/get-state owner :selected)
-                    ds (remove (set s) info)]
-                (om/set-state! owner :dont-show ds)
-                (om/set-state! owner :selected []))
-              (js/alert msg)))]
-    (if-let [ids (-> (om/get-state owner :selected) seq)]
-      (jdbu/post-params "/select-all" {:key k} h)
-      (h {:status "fail" :msg "No sequences selected."}))))
 
 ;; components
 
@@ -159,8 +157,13 @@
                            (jdbu/pub-info owner :selected (:acc protein))
                            (om/set-state! owner :selected (not selected)))}))
         (dom/div
-         #js {:className "pure-u-23-24"}
-         (str (:acc protein) " - " (:description protein))))
+         #js {:className "pure-u-23-24 thick"}
+         (str (:acc protein) " - " (if (> (count (:description protein)) 70)
+                                     (str (->> (:description protein)
+                                               (take 70)
+                                               (apply str))
+                                          " ...")
+                                     (:description protein)))))
        (dom/div
         #js {:className "pure-g"}
         (dom/div
@@ -240,8 +243,8 @@
 (defn export-loop
   [owner e]
   (condp = (:data e)
-    "only-selected" (show-only-selected owner)
-    (do (get-fasta-key owner (:data e))
+    "only-selected" (get-fasta-key owner "ids-fetch")
+    (do (get-export-key owner (:data e))
         (om/set-state! owner :ekey ""))))
 
 (defn all-none-loop
@@ -256,15 +259,15 @@
         pid (:acc p)]
     (not (some #{pid} ds))))
 
-(defn proteins-view [{:keys [key total]} owner]
+(defn proteins-view [{:keys [key total type]} owner]
   (reify
     om/IInitState
     (init-state [_]
       {:start 1
        :total total
        :proteins nil
-       :dont-show []
        :selected []
+       :type type
        :key key
        :ekey ""
        :search-info nil})
@@ -283,8 +286,22 @@
     om/IWillUnmount
     (will-unmount [_]
       (jdbu/unsubscribe owner :nav :selected :export :pos :total :all-none))
+    om/IWillUpdate 
+    (will-update [_ np ns]
+      (when-not (= (:key ns) (:key (om/get-render-state owner)))
+        (serve-proteins owner)
+        (search-info owner)))
+    om/IWillReceiveProps
+    (will-receive-props [_ {:keys [key total type]}]
+      (om/set-state! owner :key key)
+      (om/set-state! owner :type type)
+      (om/set-state! owner :total total)
+      (om/set-state! owner :selected [])
+      (om/set-state! owner :ekey "")
+      (serve-proteins owner)
+      (search-info owner))
     om/IRenderState
-    (render-state [_ {:keys [proteins total selected ekey search-info]}]
+    (render-state [_ {:keys [proteins total type selected ekey search-info] :as m}]
       (if (< 0 total)
         (dom/div
          nil
@@ -293,6 +310,8 @@
                                  (do (jdbu/log ekey)
                                      (str "/fetch?k=" ekey))
                                  "")})
+         (if (= type "text-search")
+           (om/build search "Search again ..."))
          (dom/div #js {:className "thick padded"} search-info)
          (om/build nav nil)
          (om/build select-all-none {:count (count selected) :all total})
@@ -303,16 +322,23 @@
          (om/build nav nil))
         (dom/div
          nil
-         (dom/div #js {:className "thick padded"} search-info)
-         (dom/div
-          #js {:className "pure-form pure-form-stacked"}
-          (dom/div #js {:className "padded"}
-                   (dom/button
-                    #js {:className
-                         "pure-button pure-button-primary pure-u-1"
-                         :onClick
-                         #(jdbu/pub-info owner :view nil "blast")}
-                    "New search"))))))))
+         (condp = type
+           "text-search"
+           (dom/div nil
+                    (om/build search "Search again ...")
+                    (dom/div #js {:className "thick padded"} search-info))
+           "blast"
+           (dom/div nil
+                    (dom/div #js {:className "thick padded"} search-info)
+                    (dom/div
+                     #js {:className "pure-form pure-form-stacked"}
+                     (dom/div #js {:className "padded"}
+                              (dom/button
+                               #js {:className
+                                    "pure-button pure-button-primary pure-u-1"
+                                    :onClick
+                                    #(jdbu/pub-info owner :view nil "blast")}
+                               "New search"))))))))))
 
 (defn proteins-reset [k owner]
   (reify

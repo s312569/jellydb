@@ -1,11 +1,7 @@
 (ns ^:figwheel-always jellydb.search
-  (:require-macros [cljs.core.async.macros :refer [go]])
-  (:require [ajax.core :refer [POST]]
-            [cljs.core.async :refer [put! <! >! timeout close!]]
-            [om.core :as om :include-macros true]
+  (:require [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
             [clojure.string :refer [trim]]
-            [jellydb.proteins :as psv]
             [jellydb.utilities :as jdbu]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -16,7 +12,8 @@
   [owner]
   (let [h (fn [{:keys [status id count msg]}]
             (if (= "success" status)
-              (jdbu/pub-info owner :view {:key id :total count} "proteins")
+              (jdbu/pub-info owner :view {:key id :total count :type "text-search"}
+                             "proteins")
               (js/alert msg)))
         t (om/get-state owner :text)
         text (if t (trim t) "")]
@@ -25,19 +22,24 @@
       (js/alert "No search entered!"))))
 
 (defn search
-  [_ owner]
+  [placeholder owner]
   (reify
     om/IInitState
     (init-state [_]
-      {:text ""})
+      {:text ""
+       :ph placeholder})
+    om/IWillReceiveProps
+    (will-receive-props [_ np]
+      (om/set-state! owner :ph np)
+      (om/set-state! owner :text ""))
     om/IRenderState
-    (render-state [_ {:keys [text]}]
+    (render-state [_ {:keys [text ph]}]
       (dom/div
        #js {:className "pure-g"}
        (dom/div #js {:className "pure-u-4-5"}
-                (dom/div #js {:className "padded"}
+                (dom/div nil
                          (dom/input
-                          #js {:placeholder "Search for sequences ..."
+                          #js {:placeholder ph
                                :className "myinput pure-u-1"
                                :type "text"
                                :value text
@@ -47,7 +49,7 @@
                                #(om/set-state! owner :text
                                                (-> %  .-target .-value))})))
        (dom/div #js {:className "pure-u-1-5"}
-                (dom/div #js {:className "padded"}
+                (dom/div nil
                          (dom/button
                           #js {:className
                                "pure-button pure-button-primary pure-u-1"

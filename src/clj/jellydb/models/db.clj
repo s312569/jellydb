@@ -117,28 +117,28 @@
 (defmulti return-file (fn [m] (:type m)))
 
 (defmethod return-file :default
-  [{:keys [ids id type]}]
-  (let [q (->> (map #(str "'" % "'") ids)
-               (interpose #",")
-               (apply str))]
-    (if q
-      (do (swap! req-key-map dissoc id)
-          (apply str
-                 (ut/query-db (str "select * from " type
-                                   " where acc in (" q ")")
-                              :row-fn #(-> (ut/row->biosequence %)
-                                           bs/fasta-string
-                                           (str "\n")))))
-      {:status "fail" :msg "ERROR MESSAGE!"})))
+  [{:keys [ids id type] :as m}]
+  (do (swap! req-key-map dissoc id)
+      (let [q (->> (map #(str "'" % "'") ids)
+                   (interpose #",")
+                   (apply str))
+            qu (str "acc in (" q ")")]
+        (if q
+          (ut/biosequence-query {:table (keyword type)
+                                 :where qu
+                                 :func #(->> (map bs/fasta-string %)
+                                             (interpose \newline)
+                                             (apply str))})))))
 
 (defmethod return-file "dataset-download"
   [{:keys [did table id]}]
-  (let [q (str "select * from " table
-               " where dataset=" did)]
+  (let [q (str "dataset=" did)]
     (do (swap! req-key-map dissoc id)
-        (apply str (ut/query-db q :row-fn #(-> (ut/row->biosequence %)
-                                               bs/fasta-string
-                                               (str "\n")))))))
+        (ut/biosequence-query {:table (keyword table)
+                               :where q
+                               :func #(->> (map bs/fasta-string %)
+                                           (interpose \newline)
+                                           (apply str))}))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; blast search
@@ -224,7 +224,8 @@
                           :row-fn #(get-pep (:acc %)))})
 
 (defmethod return-results "ids-fetch"
-  [{:keys [ids offset]}]
+  [{:keys [ids offset] :as m}]
+  (println m)
   {:status "success"
    :proteins (let [q (->> (map #(str "'" % "'") ids)
                           (interpose #",")

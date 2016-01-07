@@ -288,7 +288,8 @@
         (if-not (= "Not done" (om/get-state owner :done))
           (do (jdbu/pub-info owner :view
                              {:key (om/get-state owner :key)
-                              :total (om/get-state owner :done)}
+                              :total (om/get-state owner :done)
+                              :type "blast"}
                              "proteins"))
           (recur (<! (timeout 5000))))))))
 

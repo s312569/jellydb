@@ -73,23 +73,16 @@
               :row-fn row->biosequence
               :result-set-fn first)))
 
-(defmethod get-biosequence :blasts
-  [q]
-  (let [qu (str "select * from blasts where acc='" (:acc q) "'")]
-    (db/query spec qu
-              :row-fn row->biosequence
-              :result-set-fn first)))
-
 (defmethod get-biosequence :cds
   [q]
-  (let [qu (str "select * from " (name (:table q)) "  where acc='" (:acc q) "'")]
+  (let [qu (str "select * from peps where acc='" (:acc q) "'")]
     (db/query spec qu
               :row-fn pep->cds
               :result-set-fn first)))
 
 (defmethod get-biosequence :mrnas
   [q]
-  (let [qu (str "select * from " (name (:table q)) "  where acc='" (:acc q) "'")]
+  (let [qu (str "select * from peps where acc='" (:acc q) "'")]
     (db/query spec qu
               :row-fn pep->mrna
               :result-set-fn first)))
@@ -121,14 +114,30 @@
   [{:keys [table func] :or {table nil func identity}}]
   (let [qu (str "select * from peps")]
     (db/query spec qu
-              :row-fn pep->mrna
+              :row-fn pep->mrna 
               :result-set-fn func)))
 
-(defn update-db
-  [table m v]
-  (db/update! spec table m v))
+(defmulti biosequence-query (fn [q] (:table q)))
+
+(defmethod biosequence-query :default
+  [{:keys [table func where] :or {table nil func identity where nil}}]
+  (let [q (str "select * from " (name table) (if where (str " where " where)))]
+    (db/query spec q :row-fn row->biosequence :result-set-fn func)))
+
+(defmethod biosequence-query :cds
+  [{:keys [table func where] :or {table nil func identity where nil}}]
+  (let [q (str "select * from peps " (if where (str " where " where)))]
+    (db/query spec q :row-fn pep->cds :result-set-fn func)))
+
+(defmethod biosequence-query :mrnas
+  [{:keys [table func where] :or {table nil func identity where nil}}]
+  (let [q (str "select * from peps " (if where (str " where " where)))]
+    (db/query spec q :row-fn pep->mrna :result-set-fn func)))
 
 (defn query-db
   [q & rest]
   (apply db/query spec q rest))
 
+(defn update-db
+  [table m v]
+  (db/update! spec table m v))

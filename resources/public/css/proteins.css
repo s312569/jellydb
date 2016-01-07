@@ -40,6 +40,14 @@ input.pagination {
 	   padding: 10px;
 	   margin-bottom: 20px;}
 
+.hdisplay {border-radius: 10px;
+	   border-style: solid;
+	   border-color: #E8E8E8;
+	   border-width: 1px;
+	   background-color: #FCFCFC;
+	   padding: 10px;
+	   margin-bottom: 20px;}
+
 /* protein menu */
 
 .mselected {background-color: #eee;}
@@ -51,7 +59,7 @@ input.pagination {
 .my-cursor {cursor: pointer;}
 .my-text {cursor: text;}
 .small-text{font-size: 85%}
-
+.thick {font-weight: bold;}
 /* search box */
 
 #downloadframe {display: none;}
