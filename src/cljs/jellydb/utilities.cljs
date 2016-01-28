@@ -1,6 +1,6 @@
 (ns ^:figwheel-always jellydb.utilities
   (:require-macros [cljs.core.async.macros :refer [go]])
-  (:require [cljs.core.async :refer [<! chan sub put! unsub close!]]
+  (:require [cljs.core.async :refer [<! chan sub put! unsub close! timeout]]
             [ajax.core :refer [POST]]
             [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]))

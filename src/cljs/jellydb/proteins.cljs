@@ -7,7 +7,9 @@
             [jellydb.search :refer [search]]
             [jellydb.utilities :as jdbu]))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; server calls
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- get-export-key
   [owner type]
@@ -36,7 +38,8 @@
         k (om/get-state owner :key)
         h (fn [{:keys [status proteins]}]
             (if (= "success" status)
-              (om/set-state! owner :proteins proteins)
+              (do (om/set-state! owner :proteins proteins)
+                  (om/set-state! owner :showing :proteins))
               (throw (js/Error. "Can not initialise proteins."))))
         params {:offset (- (* 20 o) 20) :key k}]
     (jdbu/post-params "/proteins" params h)))
@@ -56,13 +59,14 @@
   (let [k (om/get-state owner :key)
         h (fn [{:keys [status info]}]
             (if (= "success" status)
-              (let [ds (om/get-state owner :dont-show)
-                    i (remove (set ds) info)]
-                (om/set-state! owner :selected i))
+              (do (om/set-state! owner :selected info)
+                  (jdbu/pub-info owner :all-done-done :done))
               (throw (js/Error. "Error in retrieving search information."))))]
     (jdbu/post-params "/select-all" {:key k} h)))
 
-;; components
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; export dropdown
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- export
   [_ owner]
@@ -82,6 +86,15 @@
                              :onchange-func
                              #(jdbu/pub-info owner :export (-> % .-target .-value))
                              :records r})))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; navigation
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn nav-on-click
+  [owner func]
+  (jdbu/pub-info owner :prot-spinner :spinner)
+  (jdbu/pub-info owner :nav func))
 
 (defn- nav
   [_ owner]
@@ -107,12 +120,12 @@
         (dom/button #js {:style #js {:font-size "85%"}
                          :className "pure-button"
                          :disabled (if (= 1 start) true false)
-                         :onClick #(jdbu/pub-info owner :nav (fn [_] 1))}
+                         :onClick #(nav-on-click owner (fn [_] 1))}
                     "<<")
         (dom/button #js {:style #js {:font-size "85%"}
                          :className "pure-button"
                          :disabled (if (= 1 start) true false)
-                         :onClick #(jdbu/pub-info owner :nav dec)}
+                         :onClick #(nav-on-click owner dec)}
                     "<")
         (dom/button #js {:className "buttondisplay"
                          :disabled "true"}
@@ -120,15 +133,58 @@
         (dom/button #js {:style #js {:font-size "85%"}
                          :className "pure-button"
                          :disabled (if (= start total) true false)
-                         :onClick #(jdbu/pub-info owner :nav inc)}
+                         :onClick #(nav-on-click owner inc)}
                     ">")
         (dom/button #js {:style #js {:font-size "85%"}
                          :className "pure-button"
                          :disabled (if (= total start) true false)
-                         :onClick #(jdbu/pub-info owner :nav  (fn [_] total))}
+                         :onClick #(nav-on-click owner (fn [_] total))}
                     ">>"))
        (dom/div #js {:className "pure-u-1-2"}
                 (om/build export nil))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; protein card
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn- protein-lower-info
+  [protein owner]
+  (om/component
+   (dom/div
+    #js {:className "pure-g"}
+    (dom/div
+     #js {:className "pure-u-1-24"}
+     "")
+    (dom/div
+     #js {:className "pure-u-5-24 protsumm"}
+     (str (count (:sequence protein)) " amino acid protein"))
+    (dom/div
+     #js {:className "pure-u-18-24 protsumm"}
+     (str "JellyDB accession: " (:acc protein))))))
+
+(defn- protein-cb
+  [{:keys [protein selected]} owner]
+  (om/component
+   (dom/div
+    #js {:className "pure-u-1-24"}
+    (dom/input
+     #js {:type "checkbox"
+          :checked selected
+          :onChange (fn [_]
+                      (jdbu/pub-info owner :selected (:acc protein))
+                      (om/set-state! owner :selected (not selected)))}))))
+
+(defn- protein-description
+  [protein owner]
+  (om/component
+   (dom/div
+    #js {:className "pure-u-23-24 thick"}
+    (str (:acc protein) " - " (if (> (count (:description protein)) 70)
+                                (str (->> (:description protein)
+                                          (take 70)
+                                          (apply str))
+                                     " ...")
+                                (:description protein))))))
 
 (defn- protein [protein owner]
   (reify
@@ -143,54 +199,56 @@
       (om/set-state! owner :protein np)
       (om/set-state! owner :visible "none"))
     om/IRenderState
-    (render-state [_ {:keys [selected visible acc protein]}]
+    (render-state [_ {:keys [selected visible protein]}]
       (dom/div
        #js {:className "pdisplay"}
        (dom/div
         #js {:className "pure-g"}
-        (dom/div
-         #js {:className "pure-u-1-24"}
-         (dom/input
-          #js {:type "checkbox"
-               :checked selected
-               :onChange (fn [_]
-                           (jdbu/pub-info owner :selected (:acc protein))
-                           (om/set-state! owner :selected (not selected)))}))
-        (dom/div
-         #js {:className "pure-u-23-24 thick"}
-         (str (:acc protein) " - " (if (> (count (:description protein)) 70)
-                                     (str (->> (:description protein)
-                                               (take 70)
-                                               (apply str))
-                                          " ...")
-                                     (:description protein)))))
-       (dom/div
-        #js {:className "pure-g"}
-        (dom/div
-         #js {:className "pure-u-1-24"}
-         "")
-        (dom/div
-         #js {:className "pure-u-5-24 protsumm"}
-         (str (count (:sequence protein)) " amino acid protein"))
-        (dom/div
-         #js {:className "pure-u-18-24 protsumm"}
-         (str "JellyDB accession: " acc)))
-       (dom/div
-        #js {:className "pure-g"}
-        (dom/div
-         #js {:className "pure-u-1-24"}
-         "")
-        (dom/div
-         #js {:className "pure-u-23-24"}
-         (dom/div nil
-                  (om/build p/protein-view protein))))))))
+        (om/build protein-cb {:selected selected :protein protein})
+        (om/build protein-description protein))
+       (om/build protein-lower-info protein)
+       (dom/div #js {:className "pure-g"}
+                (dom/div #js {:className "pure-u-1-24"} "")
+                (dom/div #js {:className "pure-u-23-24"}
+                         (dom/div nil
+                                  (om/build p/protein-view protein))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; select all|none
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn all-none-spinner
+  [_ owner]
+  (om/component
+   (dom/div
+    #js {:className "pure-u-2-24"}
+    (dom/div
+     #js {:id "escapingBallG"}
+     (dom/div #js {:id "escapingBall_1" :className "escapingBallG"})))))
+
+(defn all-none-do
+  [k owner]
+  (if (= k :all)
+    (om/set-state! owner :showing :spinner)
+    (om/set-state! owner :showing :links))
+  (jdbu/pub-info owner :all-none k)
+  (om/set-state! owner :selected k))
 
 (defn select-all-none
   [{:keys [count all]} owner]
   (reify
     om/IInitState
     (init-state [_]
-      {:selected :none})
+      {:selected :none
+       :showing :links})
+    om/IWillMount
+    (will-mount [_]
+      (jdbu/register-loop owner :all-done-done
+                          (fn [o e]
+                            (om/set-state! owner :showing :links))))
+    om/IWillUnmount
+    (will-unmount [_]
+      (jdbu/unsubscribe owner :all-done-done))
     om/IWillReceiveProps
     (will-receive-props [_ {:keys [count all]}]
       (cond (= count 0)
@@ -200,25 +258,26 @@
             (> count 0)
             (om/set-state! owner :selected :both)))
     om/IRenderState
-    (render-state [_ {:keys [selected]}]
+    (render-state [_ {:keys [selected showing]}]
       (dom/div
        #js {:className "tbpadded"}
        "Select: "
-       (dom/a #js {:onClick
-                   #(do (jdbu/pub-info owner :all-none :all)
-                        (om/set-state! owner :selected :all))
-                   :className (if (= selected :all)
-                                "flinki" "flinka")}
-              "All")
-       " | "
-       (dom/a #js {:onClick
-                   #(do (jdbu/pub-info owner :all-none :none)
-                        (om/set-state! owner :selected :none))
-                   :className (if (= selected :none)
-                                "flinki" "flinka")}
-              "None")))))
+       (condp = showing
+         :links (dom/div #js {:className "pure-u-4-24"}
+                         (dom/a #js {:onClick #(all-none-do :all owner)
+                                     :className (if (= selected :all)
+                                                  "flinki" "flinka")}
+                                "All")
+                         " | "
+                         (dom/a #js {:onClick #(all-none-do :none owner)
+                                     :className (if (= selected :none)
+                                                  "flinki" "flinka")}
+                                "None"))
+         :spinner (om/build all-none-spinner nil))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; loops
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- checked? [p owner]
   (assoc p :checked
@@ -259,30 +318,86 @@
         pid (:acc p)]
     (not (some #{pid} ds))))
 
-(defn proteins-view [{:keys [key total type]} owner]
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; proteins view
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn- init-pv
+  [{:keys [key type total]} owner]
+  (om/set-state! owner :key key)
+  (om/set-state! owner :type type)
+  (om/set-state! owner :total total)
+  (om/set-state! owner :selected [])
+  (om/set-state! owner :ekey "")
+  (serve-proteins owner)
+  (search-info owner))
+
+(defn- init-pv-loops
+  [owner]
+  (jdbu/register-loop owner :nav protein-serve)
+  (jdbu/register-loop owner :export export-loop)
+  (jdbu/register-loop owner :selected selected-loop)
+  (jdbu/register-loop owner :pos (fn [o e]
+                                   (jdbu/put-state o e :start)))
+  (jdbu/register-loop owner :total (fn [o e]
+                                     (jdbu/put-state o e :total)))
+  (jdbu/register-loop owner :all-none all-none-loop)
+  (jdbu/register-loop owner :prot-spinner (fn [o e]
+                                            (om/set-state! owner :showing
+                                                           :spinner))))
+
+(defn- download-frame
+  [ekey _]
+  (om/component
+   (dom/iframe #js {:id "downloadframe"
+                    :src (if-not (= ekey "")
+                           (str "/fetch?k=" ekey)
+                           "")})))
+
+(defn- search-box
+  [type owner]
+  (om/component
+   (if (= type "text-search")
+     (om/build search "Search again ..."))))
+
+(defn- search-again
+  [{:keys [search-info type]} owner]
+  (om/component
+   (condp = type
+     "text-search"
+     (dom/div nil
+              (om/build search "Search again ...")
+              (dom/div #js {:className "thick padded"} search-info))
+     "blast"
+     (dom/div nil
+              (dom/div #js {:className "thick padded"} search-info)
+              (dom/div
+               #js {:className "pure-form pure-form-stacked"}
+               (dom/div #js {:className "padded"}
+                        (dom/button
+                         #js {:className
+                              "pure-button pure-button-primary pure-u-1"
+                              :onClick
+                              #(jdbu/pub-info owner :view nil "blast")}
+                         "New search")))))))
+
+(defn proteins-view [hm owner]
   (reify
     om/IInitState
     (init-state [_]
       {:start 1
-       :total total
+       :total 0
        :proteins nil
        :selected []
-       :type type
-       :key key
+       :showing :proteins
+       :type nil
+       :key nil
        :ekey ""
        :search-info nil})
     om/IWillMount
     (will-mount [_]
-      (serve-proteins owner)
-      (search-info owner)
-      (jdbu/register-loop owner :nav protein-serve)
-      (jdbu/register-loop owner :export export-loop)
-      (jdbu/register-loop owner :selected selected-loop)
-      (jdbu/register-loop owner :pos (fn [o e]
-                                       (jdbu/put-state o e :start)))
-      (jdbu/register-loop owner :total (fn [o e]
-                                         (jdbu/put-state o e :total)))
-      (jdbu/register-loop owner :all-none all-none-loop))
+      (init-pv hm owner)
+      (init-pv-loops owner))
     om/IWillUnmount
     (will-unmount [_]
       (jdbu/unsubscribe owner :nav :selected :export :pos :total :all-none))
@@ -292,53 +407,33 @@
         (serve-proteins owner)
         (search-info owner)))
     om/IWillReceiveProps
-    (will-receive-props [_ {:keys [key total type]}]
-      (om/set-state! owner :key key)
-      (om/set-state! owner :type type)
-      (om/set-state! owner :total total)
-      (om/set-state! owner :selected [])
-      (om/set-state! owner :ekey "")
-      (serve-proteins owner)
-      (search-info owner))
+    (will-receive-props [_ np]
+      (init-pv np owner))
     om/IRenderState
-    (render-state [_ {:keys [proteins total type selected ekey search-info] :as m}]
+    (render-state [_ {:keys [proteins total type selected
+                             ekey search-info showing] :as m}]
       (if (< 0 total)
         (dom/div
          nil
-         (dom/iframe #js {:id "downloadframe"
-                          :src (if-not (= ekey "")
-                                 (do (jdbu/log ekey)
-                                     (str "/fetch?k=" ekey))
-                                 "")})
-         (if (= type "text-search")
-           (om/build search "Search again ..."))
+         (om/build download-frame ekey)
+         (om/build search-box type)
          (dom/div #js {:className "thick padded"} search-info)
          (om/build nav nil)
          (om/build select-all-none {:count (count selected) :all total})
-         (apply dom/div #js {:className "padded"}
-                (om/build-all protein
-                              (->> (filter #(shown? owner %) proteins)
-                                   (map #(checked? % owner)))))
+         
+         (if (= showing :proteins)
+           (apply dom/div #js {:className "padded"}
+                  (om/build-all protein (map #(checked? % owner) proteins)))
+           (dom/div #js {:className "loader"}
+                    "Loading"))
          (om/build nav nil))
         (dom/div
          nil
-         (condp = type
-           "text-search"
-           (dom/div nil
-                    (om/build search "Search again ...")
-                    (dom/div #js {:className "thick padded"} search-info))
-           "blast"
-           (dom/div nil
-                    (dom/div #js {:className "thick padded"} search-info)
-                    (dom/div
-                     #js {:className "pure-form pure-form-stacked"}
-                     (dom/div #js {:className "padded"}
-                              (dom/button
-                               #js {:className
-                                    "pure-button pure-button-primary pure-u-1"
-                                    :onClick
-                                    #(jdbu/pub-info owner :view nil "blast")}
-                               "New search"))))))))))
+         (om/build search-again {:search-info search-info :type type}))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; proteins view
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn proteins-reset [k owner]
   (reify
