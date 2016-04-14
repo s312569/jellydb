@@ -8,7 +8,7 @@
 (defn- proteins
   [form-data]
   (layout/common
-   (include-js "http://fb.me/react-0.11.1.js")
+   (include-js "js/react-v0.11.1.js")
    (include-js "js/out/goog/base.js")
    (include-js "/js/app.js")
    (include-js "/js/out/processing.js")

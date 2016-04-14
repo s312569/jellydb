@@ -7,9 +7,11 @@
     [:meta {:charset "utf-8"}]
     [:meta {:content "width=device-width, initial-scale=1.0"
             :name "viewport"}]
-    [:link {:href "http://yui.yahooapis.com/pure/0.6.0/pure-min.css" :rel "stylesheet"}]
-    [:link {:rel "stylesheet" :href "http://yui.yahooapis.com/pure/0.6.0/grids-responsive-min.css"}]
+    ;; [:link {:href "http://yui.yahooapis.com/pure/0.6.0/pure-min.css" :rel "stylesheet"}]
+    ;; [:link {:rel "stylesheet" :href "http://yui.yahooapis.com/pure/0.6.0/grids-responsive-min.css"}]
     [:title "JellyDB"]
+    (include-css "/css/pure-release-0.6.0/pure-min.css")
+    (include-css "/css/pure-release-0.6.0/grids-responsive-min.css")
     (include-css "/css/layout.css")
     (include-css "/css/proteins.css")
     (include-css "/css/buttons.css")
