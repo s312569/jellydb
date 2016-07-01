@@ -23,8 +23,7 @@
 
 (defn- blast-path
   []
-  (str (fs/absolute-path (io/resource "blast"))
-       "/"))
+  (str (fs/absolute-path (io/resource "blast")) "/"))
 
 (defn- all-to-file
   [table file]
