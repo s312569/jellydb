@@ -2,9 +2,10 @@
   (:require [jellydb.models.utilities :as ut]
             [jellydb.models.blast :as bl]
             [clojure.string :as st]
-            [clj-biosequence.core :as bs]
-            [clj-biosequence.interproscan :as ips]
-            [clj-biosequence.blast :as blast]
+            [clj-fasta.core :as fa]
+            [clj-interproscan.core :as ips]
+            [clj-blast.core :as bl]
+            [biodb.core :as bdb]
             [clojure.data.json :as json])
   (:import [org.postgresql.util PGobject]))
 
