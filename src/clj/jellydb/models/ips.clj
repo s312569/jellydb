@@ -1,7 +1,10 @@
 (ns jellydb.models.ips
   (:require [clojure.string :as st]
-            [clj-biosequence.core :as bs]
-            [clj-biosequence.interproscan :as ip]))
+            [clj-interproscan.core :as ips]
+            [jellydb.models.db :refer all]))
+
+
+
 
 (defn ips-sequences
   [f]
