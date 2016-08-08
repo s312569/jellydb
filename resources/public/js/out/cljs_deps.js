@@ -1,5 +1,5 @@
 goog.addDependency("base.js", ['goog'], []);
-goog.addDependency("../cljs/core.js", ['cljs.core'], ['goog.string', 'goog.object', 'goog.string.StringBuffer', 'goog.array']);
+goog.addDependency("../cljs/core.js", ['cljs.core'], ['goog.string', 'goog.object', 'goog.math.Integer', 'goog.string.StringBuffer', 'goog.array', 'goog.math.Long']);
 goog.addDependency("../ajax/protocols.js", ['ajax.protocols'], ['cljs.core']);
 goog.addDependency("../ajax/xml_http_request.js", ['ajax.xml_http_request'], ['cljs.core', 'ajax.protocols']);
 goog.addDependency("../com/cognitect/transit/util.js", ['com.cognitect.transit.util'], ['goog.object']);
@@ -11,7 +11,7 @@ goog.addDependency("../com/cognitect/transit/impl/decoder.js", ['com.cognitect.t
 goog.addDependency("../com/cognitect/transit/impl/reader.js", ['com.cognitect.transit.impl.reader'], ['com.cognitect.transit.impl.decoder', 'com.cognitect.transit.caching']);
 goog.addDependency("../com/cognitect/transit/handlers.js", ['com.cognitect.transit.handlers'], ['com.cognitect.transit.util', 'com.cognitect.transit.types', 'goog.math.Long']);
 goog.addDependency("../com/cognitect/transit/impl/writer.js", ['com.cognitect.transit.impl.writer'], ['com.cognitect.transit.util', 'com.cognitect.transit.caching', 'com.cognitect.transit.handlers', 'com.cognitect.transit.types', 'com.cognitect.transit.delimiters', 'goog.math.Long']);
-goog.addDependency("../com/cognitect/transit.js", ['com.cognitect.transit'], ['com.cognitect.transit.impl.reader', 'com.cognitect.transit.impl.writer', 'com.cognitect.transit.types', 'com.cognitect.transit.eq', 'com.cognitect.transit.impl.decoder', 'com.cognitect.transit.caching']);
+goog.addDependency("../com/cognitect/transit.js", ['com.cognitect.transit'], ['com.cognitect.transit.util', 'com.cognitect.transit.impl.reader', 'com.cognitect.transit.impl.writer', 'com.cognitect.transit.types', 'com.cognitect.transit.eq', 'com.cognitect.transit.impl.decoder', 'com.cognitect.transit.caching']);
 goog.addDependency("../cognitect/transit.js", ['cognitect.transit'], ['com.cognitect.transit.eq', 'cljs.core', 'com.cognitect.transit.types', 'com.cognitect.transit', 'goog.math.Long']);
 goog.addDependency("../clojure/string.js", ['clojure.string'], ['goog.string', 'cljs.core', 'goog.string.StringBuffer']);
 goog.addDependency("../ajax/xhrio.js", ['ajax.xhrio'], ['goog.net.XhrManager', 'goog.net.XhrIo', 'goog.json', 'goog.Uri', 'cljs.core', 'goog.net.EventType', 'ajax.protocols', 'goog.events', 'goog.net.ErrorCode']);
@@ -46,7 +46,10 @@ goog.addDependency("../jellydb/protein.js", ['jellydb.protein'], ['jellydb.seque
 goog.addDependency("../jellydb/proteins.js", ['jellydb.proteins'], ['jellydb.utilities', 'cljs.core', 'cljs_http.client', 'om.dom', 'cljs.core.async', 'jellydb.search', 'jellydb.protein', 'om.core']);
 goog.addDependency("../clojure/browser/event.js", ['clojure.browser.event'], ['cljs.core', 'goog.events.EventTarget', 'goog.events.EventType', 'goog.events']);
 goog.addDependency("../clojure/browser/net.js", ['clojure.browser.net'], ['goog.net.xpc.CfgFields', 'goog.net.XhrIo', 'goog.json', 'goog.Uri', 'cljs.core', 'goog.net.EventType', 'goog.net.xpc.CrossPageChannel', 'goog.net.WebSocket', 'clojure.browser.event']);
-goog.addDependency("../cljs/repl.js", ['cljs.repl'], ['cljs.core']);
+goog.addDependency("../cljs/spec/impl/gen.js", ['cljs.spec.impl.gen'], ['cljs.core']);
+goog.addDependency("../clojure/walk.js", ['clojure.walk'], ['cljs.core']);
+goog.addDependency("../cljs/spec.js", ['cljs.spec'], ['cljs.core', 'goog.object', 'cljs.spec.impl.gen', 'clojure.string', 'clojure.walk']);
+goog.addDependency("../cljs/repl.js", ['cljs.repl'], ['cljs.core', 'cljs.spec']);
 goog.addDependency("../clojure/browser/repl.js", ['clojure.browser.repl'], ['goog.dom', 'goog.userAgent.product', 'cljs.core', 'goog.object', 'clojure.browser.net', 'cljs.repl', 'goog.array', 'clojure.browser.event']);
 goog.addDependency("../jellydb/links.js", ['jellydb.links'], ['jellydb.utilities', 'cljs.core', 'om.dom', 'om.core']);
 goog.addDependency("../jellydb/blast.js", ['jellydb.blast'], ['jellydb.utilities', 'jellydb.proteins', 'cljs.core', 'om.dom', 'cljs.core.async', 'om.core', 'clojure.string']);
@@ -54,9 +57,10 @@ goog.addDependency("../jellydb/contact.js", ['jellydb.contact'], ['jellydb.utili
 goog.addDependency("../jellydb/datasets.js", ['jellydb.datasets'], ['jellydb.utilities', 'cljs.core', 'cljs_http.client', 'om.dom', 'om.core']);
 goog.addDependency("../jellydb/core.js", ['jellydb.core'], ['ajax.core', 'jellydb.utilities', 'jellydb.proteins', 'clojure.browser.repl', 'cljs.core', 'cljs_http.client', 'om.dom', 'jellydb.links', 'cljs.core.async', 'jellydb.search', 'jellydb.blast', 'om.core', 'goog.events', 'jellydb.contact', 'jellydb.datasets']);
 goog.addDependency("../clojure/set.js", ['clojure.set'], ['cljs.core']);
-goog.addDependency("../figwheel/client/utils.js", ['figwheel.client.utils'], ['cljs.core', 'clojure.string']);
+goog.addDependency("../figwheel/client/utils.js", ['figwheel.client.utils'], ['goog.userAgent.product', 'cljs.core', 'clojure.string']);
 goog.addDependency("../figwheel/client/file_reloading.js", ['figwheel.client.file_reloading'], ['goog.string', 'goog.net.jsloader', 'goog.Uri', 'cljs.core', 'goog.object', 'cljs.core.async', 'clojure.set', 'figwheel.client.utils', 'clojure.string']);
+goog.addDependency("../cljs/pprint.js", ['cljs.pprint'], ['goog.string', 'cljs.core', 'goog.string.StringBuffer', 'clojure.string']);
 goog.addDependency("../figwheel/client/socket.js", ['figwheel.client.socket'], ['cljs.core', 'figwheel.client.utils', 'cljs.reader']);
-goog.addDependency("../figwheel/client/heads_up.js", ['figwheel.client.heads_up'], ['goog.string', 'cljs.core', 'cljs.core.async', 'figwheel.client.socket', 'clojure.string']);
-goog.addDependency("../figwheel/client.js", ['figwheel.client'], ['goog.userAgent.product', 'goog.Uri', 'cljs.core', 'cljs.core.async', 'figwheel.client.file_reloading', 'figwheel.client.utils', 'cljs.repl', 'figwheel.client.heads_up', 'figwheel.client.socket', 'clojure.string']);
+goog.addDependency("../figwheel/client/heads_up.js", ['figwheel.client.heads_up'], ['goog.dom', 'goog.string', 'cljs.core', 'goog.dom.dataset', 'goog.object', 'cljs.core.async', 'cljs.pprint', 'figwheel.client.socket', 'clojure.string']);
+goog.addDependency("../figwheel/client.js", ['figwheel.client'], ['goog.userAgent.product', 'goog.Uri', 'cljs.core', 'goog.object', 'cljs.core.async', 'figwheel.client.file_reloading', 'figwheel.client.utils', 'cljs.repl', 'figwheel.client.heads_up', 'figwheel.client.socket', 'clojure.string', 'cljs.reader']);
 goog.addDependency("../figwheel/connect.js", ['figwheel.connect'], ['cljs.core', 'jellydb.core', 'figwheel.client', 'figwheel.client.utils']);

@@ -1,10 +1,9 @@
 (ns jellydb.models.blast
   (:require [clj-blast.core :as bl]
-            [biodb.core :as bdb]
+            [jellydb.models.utilities :refer [working-file]]
             [jellydb.models.db :refer :all]
             [clojure.string :refer [split]]
             [clojure.java.io :refer [reader]]
-            [jellydb.models.utilities :refer [working-file]]
             [fs.core :refer [delete]]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -27,10 +26,7 @@
                                       :params {"-max_target_seqs" "1"})
                      :db x}))
                 blast-dbs))
-        blasts (bdb/query-sequences dbspec
-                                    ["select * from peptides where dataset=?" did]
-                                    :peptide
-                                    :apply-func func)]
+        blasts (apply-to-dataset {:table :peptides :func func :did did})]
     (doseq [{:keys [files db]} blasts]
       (try
         (dorun (map (fn [file]
@@ -42,7 +38,7 @@
                              (map #(update-in % [:Hit_id] (:id-parse db)))
                              (map #(hash-map :hit % :database (:name db)
                                              :accession (:query-accession %)))
-                             (bdb/insert-sequences! dbspec :blasts :blast))))
+                             (insert-sequences :blasts))))
                     files))
         (finally
           (dorun (map delete files)))))))

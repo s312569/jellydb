@@ -25,9 +25,11 @@
 (defn apply-default-headers!
   "Takes an XhrIo object and applies the default-headers to it."
   [xhr headers]
-  (doseq [h-name (map util/camelize (keys headers))
-          h-val (vals headers)]
-    (.set (.-headers xhr) h-name h-val)))
+  (let [formatted-h (zipmap (map util/camelize (keys headers)) (vals headers))]
+    (dorun
+      (map (fn [[k v]]
+             (.set (.-headers xhr) k v))
+           formatted-h))))
 
 (defn apply-response-type!
   "Takes an XhrIo object and sets response-type if not nil."
@@ -70,7 +72,7 @@
 (defn xhr
   "Execute the HTTP request corresponding to the given Ring request
   map and return a core.async channel."
-  [{:keys [request-method headers body with-credentials? cancel] :as request}]
+  [{:keys [request-method headers body with-credentials? cancel progress] :as request}]
   (let [channel (async/chan)
         request-url (util/build-url request)
         method (name (or request-method :get))
@@ -92,6 +94,16 @@
                  (swap! pending-requests dissoc channel)
                  (if cancel (async/close! cancel))
                  (async/close! channel))))
+
+    (when progress
+      (let [listener (fn [direction evt]
+                       (async/put! progress (merge {:direction direction :loaded (.-loaded evt)}
+                                                   (if (.-lengthComputable evt) {:total (.-total evt)}))))]
+        (doto xhr
+          (.setProgressEventsEnabled true)
+          (.listen EventType.UPLOAD_PROGRESS (partial listener :upload))
+          (.listen EventType.DOWNLOAD_PROGRESS (partial listener :download)))))
+
     (.send xhr request-url method body headers)
     (if cancel
       (go
@@ -103,7 +115,9 @@
 (defn jsonp
   "Execute the JSONP request corresponding to the given Ring request
   map and return a core.async channel."
-  [{:keys [timeout callback-name cancel] :as request}]
+  [{:keys [timeout callback-name cancel keywordize-keys?]
+    :or {keywordize-keys? true}
+    :as request}]
   (let [channel (async/chan)
         jsonp (Jsonp. (util/build-url request) callback-name)]
     (.setRequestTimeout jsonp timeout)
@@ -111,7 +125,7 @@
                      (fn success-callback [data]
                        (let [response {:status 200
                                        :success true
-                                       :body (js->clj data :keywordize-keys true)}]
+                                       :body (js->clj data :keywordize-keys keywordize-keys?)}]
                          (async/put! channel response)
                          (swap! pending-requests dissoc channel)
                          (if cancel (async/close! cancel))

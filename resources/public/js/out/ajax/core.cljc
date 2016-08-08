@@ -1,7 +1,6 @@
 (ns ajax.core
   (:require [clojure.string :as str]
             [cognitect.transit :as t]
-            [clojure.string :as s]
             [ajax.protocols :refer
              [-body -process-request -process-response -abort -status
               -get-response-header -status-text -js-ajax-request
@@ -95,8 +94,7 @@
   (->> (if (string? content-type)
          [content-type]
          content-type)
-       (map #(str % "; charset=utf-8"))
-       (s/join ", ")))
+       (str/join ", ")))
 
 (defrecord ResponseFormat [read description content-type]
   Interceptor
@@ -137,7 +135,7 @@
 ;;; Request Format Record
 
 #? (:cljs
-    (defn params-to-str-old [params]
+    (defn params-to-str-alt [params]
       (if params
         (-> params
             clj->js
@@ -178,7 +176,7 @@
        (map (fn [[k v]] (str k "=" v)))
        (str/join "&")))
 
-(defn uri-with-params [uri params]
+(p/defn-curried uri-with-params [params params-to-str uri]
   (if params
     (str uri
          (if (re-find #"\?" uri) "&" "?") ; add & if uri contains ?
@@ -191,12 +189,12 @@
    (ifn? format) {:write format :content-type "text/plain"}
    :else {}))
 
-(defrecord ProcessGet []
+(defrecord ProcessGet [params-to-str]
   Interceptor
   (-process-request [_ {:keys [method] :as request}]
     (if (= method "GET")
       (reduced (update request :uri
-                       #(uri-with-params % (:params request))))
+                       (uri-with-params (:params request) params-to-str)))
       request))
   (-process-response [_ response] response))
 
@@ -290,7 +288,7 @@
 
 (defn url-request-format []
   {:write (to-utf8-writer params-to-str)
-   :content-type "application/x-www-form-urlencoded"})
+   :content-type "application/x-www-form-urlencoded; charset=utf-8"})
 
 (defn raw-response-format
   ([] (map->ResponseFormat {:read -body
@@ -301,7 +299,7 @@
 
 (defn text-request-format []
   {:write (to-utf8-writer identity)
-   :content-type "text/plain"})
+   :content-type "text/plain; charset=utf-8"})
 
 #? (:clj
     ;;; http://stackoverflow.com/questions/309424/read-convert-an-inputstream-to-a-string
@@ -377,9 +375,9 @@
 ;;; Detection and Accept Code
 
 (def default-formats
-  [["application/json" json-response-format]
-   ["application/transit+json" transit-response-format]
+  [["application/transit+json" transit-response-format]
    ["application/transit+transit" transit-response-format]
+   ["application/json" json-response-format]
    ["text/plain" text-response-format]
    ["text/html" text-response-format]
    ["*/*" raw-response-format]])
@@ -478,7 +476,7 @@
     (js-handler handler interceptors)
     (throw-error "No ajax handler provided.")))
 
-(def request-interceptors [(ProcessGet.) (DirectSubmission.) (ApplyRequestFormat.)])
+(def request-interceptors [(ProcessGet. params-to-str) (DirectSubmission.) (ApplyRequestFormat.)])
 
 (def default-interceptors (atom []))
 
@@ -542,12 +540,28 @@
          (apply vector))
     (keyword-response-format-element format format-params)))
 
-(p/defn-curried transform-handler
-  [{:keys [handler error-handler finally]} [ok result]]
-  (if-let [h (if ok handler error-handler)]
-    (h result))
-  (when (fn? finally)
-    (finally)))
+(defn print-response [response]
+  (println "CLJS-AJAX response:" response))
+
+(def default-handler (atom print-response))
+
+(defn print-error-response [response]
+  #? (:clj  (println "CLJS-AJAX ERROR:" response)
+      :cljs (cond (exists? js/console) (.error js/console response)
+                  (exists? js/window)  (.alert js/window (str response))
+                  :else                (println "CLJS-AJAX ERROR:" response))))
+
+(def default-error-handler
+  (atom print-error-response))
+
+(defn transform-handler
+  [{:keys [handler error-handler finally]}]
+  (let [h (or handler @default-handler)
+        e (or error-handler @default-error-handler)]
+    (fn easy-handler [[ok result]]
+      ((if ok h e) result)
+      (when (fn? finally)
+        (finally)))))
 
 (defn transform-opts [{:keys [method format response-format
                               params body]

@@ -147,12 +147,47 @@
   (->> (:coll q)
        (map #(assoc % :hit (pr-str (:hit %))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; utilities
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; (def req-key-map (atom {}))
+(defn- query
+  [q type func]
+  (bdb/query-sequences dbspec q type :apply-func func))
+
+(defmulti apply-to-dataset (fn [m] (:table m)))
+
+(defmethod apply-to-dataset :peptides
+  [{:keys [table func did] :as m}]
+  (query ["select * from peptides where dataset=?" did] :peptide func))
+
+(defmethod apply-to-dataset :contigs
+  [{:keys [table func did] :as m}]
+  (query ["select * from contigs where dataset=?" did] :contig func))
+
+(defmulti insert-sequences (fn [table c] table))
+
+(defmethod insert-sequences :blasts
+  [table c]
+  (bdb/insert-sequences! dbspec table :blast c))
+
+(defmethod insert-sequences :interproscan
+  [table c]
+  (bdb/insert-sequences! dbspec table :ips c))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; utilities
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(def req-key-map (atom {}))
+
+
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ;; construct peptides
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmulti get-data-by-id (fn [id table] table))
 
 ;; (defn get-assembly [id]
 ;;   (let [q (str "select * from assemblies where id=" id)]

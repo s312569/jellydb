@@ -1,6 +1,6 @@
 (ns jellydb.models.import
   (:require [jellydb.models.blast :refer [blast-dataset]]
-;;            [jellydb.models.ips :as ip]
+            [jellydb.models.ips :as ip]
             [jellydb.models.db :refer :all]
             [jellydb.models.utilities :refer [working-directory working-file]]
             [biodb.core :as bdb]
@@ -78,8 +78,7 @@
                         (throw (Exception. (str "Exception: " (:err res))))))))
           x)]
     (try
-      (bdb/query-sequences dbspec ["select * from contigs where dataset=?" did] :contig
-                           :apply-func func)
+      (apply-to-dataset {:table :contigs :did did :func func})
       (import-peptides [(str tf ".transdecoder.pep")] did con)
       (import-mrnas [(str tf ".transdecoder.mRNA")] did con)
       (import-cdss [(str tf ".transdecoder.cds")] did con)
@@ -110,7 +109,9 @@
     (bdb/with-transaction [con dbspec]
       (transdecode @did con))
     (bdb/with-transaction [con dbspec]
-      (blast-dataset @did))))
+      (blast-dataset @did))
+    (bdb/with-transaction [con dbspec]
+      (ip/ips-dataset @did))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; testing
