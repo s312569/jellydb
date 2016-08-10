@@ -7,13 +7,8 @@
             [jellydb.models.db :as db]
             [ring.middleware.defaults :refer [wrap-defaults site-defaults]]
             [jellydb.routes.home :refer [home-routes]]
-            [jellydb.routes.proteins :refer [proteins-routes]]))
-
-(defn init []
-  (println "jellydb is starting"))
-
-(defn destroy []
-  (println "jellydb is shutting down"))
+            [jellydb.routes.proteins :refer [proteins-routes]]
+            [jellydb.server :as wss]))
 
 (defroutes app-routes
   (route/resources "/")
@@ -41,10 +36,12 @@
   ;;            (content-type "application/octet-stream")
   ;;            (header "Content-Disposition"
   ;;                    "attachment; filename=sequences.fasta"))))
+  (GET  "/chsk" req (:ring-ajax-get-or-ws-handshake @wss/websocket req))
+  (POST "/chsk" req (:ring-ajax-post @wss/websocket req))
   (route/not-found "Not Found"))
 
 (def app
-  (-> (routes home-routes app-routes)
+  (-> (routes home-routes proteins-routes app-routes)
       (middleware/wrap-json-body {:keywords? true})
       (middleware/wrap-json-response)
       (wrap-defaults (assoc site-defaults :security {:anti-forgery false}))))

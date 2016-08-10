@@ -14,8 +14,8 @@
 ;; logging
 
 (defn log
-  [m]
-  (.log js/console m))
+  [& s]
+  (.log js/console (apply str s)))
 
 (defn print-state
   ([owner] (print-state owner nil))

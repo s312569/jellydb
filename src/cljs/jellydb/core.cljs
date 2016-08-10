@@ -9,10 +9,12 @@
             [jellydb.utilities :as jdbu]
             [jellydb.blast :refer [blast-view blast-waiting]]
             [jellydb.search :refer [search]]
-            [jellydb.proteins :refer [proteins-view proteins-reset]]
+            [jellydb.proteins :as proteins]
             [jellydb.links :refer [nav-links]]
             [jellydb.datasets :refer [datasets-view]]
             [jellydb.contact :refer [contact-view]]
+            [jellydb.server :as serve]
+            [jellydb.home :as home]
             [cljs-http.client :as http]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -42,8 +44,6 @@
                (condp = (:view view)
                  "blast" (om/build blast-view (:data view))
                  "blast-waiting" (om/build blast-waiting (:data view))
-                 "proteins" (om/build proteins-view (:data view))
-                 "proteins-reset" (om/build proteins-reset (:data view))
                  "datasets" (om/build datasets-view (:data view))
                  "contact" (om/build contact-view (:data view)))))))
 
@@ -58,16 +58,23 @@
 ;; main
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn main []
-  (let [req-chan     (chan)
-        pub-chan     (chan)
-        notif-chan   (pub pub-chan :topic)]
-    (om/root
-     outer
-     nil
-     {:shared {:req-chan   req-chan
-               :notif-chan notif-chan
-               :pub-chan   pub-chan}
-      :target (. js/document (getElementById "t"))})))
+(defn ^:export init []
+  (om/root outer
+           nil
+           {:target (. js/document (getElementById "t"))
+            :shared @serve/app-state}))
 
-(main)
+;; (defn main []
+;;   (let [req-chan     (chan)
+;;         pub-chan     (chan)
+;;         notif-chan   (pub pub-chan :topic)]
+;;     (om/root
+;;      outer
+;;      nil
+;;      {:shared {:req-chan   req-chan
+;;                :notif-chan notif-chan
+;;                :pub-chan   pub-chan}
+;;       :target (. js/document (getElementById "t"))})))
+
+;;(main)
+

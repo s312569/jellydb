@@ -29,12 +29,12 @@
                  [biodb "0.2.0"]
                  [clj-fasta "0.1.7"]
                  [clj-blast "0.2.7"]
-                 [clj-interproscan "0.1.8"]]
+                 [clj-interproscan "0.1.8"]
+                 [http-kit "2.1.18"]
+                 [com.taoensso/sente "1.8.1"]]
   :plugins [[cider/cider-nrepl "0.14.0-SNAPSHOT"]
             [lein-cljsbuild "1.1.3"]
             [lein-figwheel "0.5.4-7"]]
-  :source-paths ["src/clj" "src/cljs"]
-  :resource-paths ["resources"]
   :clean-targets ^{:protect false} ["resources/public/js/out"
                                     "resources/public/js/app.js"]
   :figwheel {:ring-handler jellydb.handler/app}
@@ -43,7 +43,5 @@
                         :figwheel true
                         :compiler {:output-to "resources/public/js/app.js"
                                    :output-dir "resources/public/js/out"
-                                   :main jellydb.core
-                                   :asset-path "js/out"
-                                   :optimizations :none
-                                   :source-map true}}]})
+                                   :main "jellydb.core"
+                                   :asset-path "js/out"}}]})

@@ -5,14 +5,16 @@
             [hiccup.page :refer [include-js]]))
 
 (defn- proteins
-  [form-data]
+  [{:keys [search key]}]
   (layout/common
    (include-js "js/react-v0.11.1.js")
    (include-js "js/out/goog/base.js")
    (include-js "/js/app.js")
    (include-js "/js/out/processing.js")
-   [:script {:type "text/javascript"} "goog.require(\"jellydb.core\");"]))
+   (str "<script>jellydb.proteins.init(\"" key "\");</script>")))
 
 (defroutes proteins-routes
-  (GET "/psearch" []
-       (proteins [] (proteins))))
+  (POST "/proteins" request
+        ;;(proteins (:params request))
+        (str request)
+        ))

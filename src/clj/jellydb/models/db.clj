@@ -175,19 +175,9 @@
   [table c]
   (bdb/insert-sequences! dbspec table :ips c))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; utilities
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(def req-key-map (atom {}))
-
-
-
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ;; construct peptides
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defmulti get-data-by-id (fn [id table] table))
 
 ;; (defn get-assembly [id]
 ;;   (let [q (str "select * from assemblies where id=" id)]
