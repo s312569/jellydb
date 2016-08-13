@@ -7,7 +7,6 @@
             [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
             [jellydb.utilities :as jdbu]
-            [jellydb.blast :refer [blast-view blast-waiting]]
             [jellydb.search :refer [search]]
             [jellydb.proteins :as proteins]
             [jellydb.links :refer [nav-links]]
@@ -40,12 +39,7 @@
     (render-state [_ {:keys [view]}]
       (dom/div nil
                (dom/div #js {:className "hcenter"}
-                        (om/build nav-links (:view view)))
-               (condp = (:view view)
-                 "blast" (om/build blast-view (:data view))
-                 "blast-waiting" (om/build blast-waiting (:data view))
-                 "datasets" (om/build datasets-view (:data view))
-                 "contact" (om/build contact-view (:data view)))))))
+                        (om/build nav-links (:view view)))))))
 
 (defn outer
   [app owner]

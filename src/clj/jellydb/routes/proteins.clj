@@ -5,16 +5,15 @@
             [hiccup.page :refer [include-js]]))
 
 (defn- proteins
-  [{:keys [search key]}]
+  [key _]
+  (println (str "*****************: " key))
   (layout/common
-   (include-js "js/react-v0.11.1.js")
-   (include-js "js/out/goog/base.js")
+   (include-js "/js/react-v0.11.1.js")
+   (include-js "/js/out/goog/base.js")
    (include-js "/js/app.js")
    (include-js "/js/out/processing.js")
    (str "<script>jellydb.proteins.init(\"" key "\");</script>")))
 
 (defroutes proteins-routes
-  (POST "/proteins" request
-        ;;(proteins (:params request))
-        (str request)
-        ))
+  (GET "/prots/:key/:offset" [key offset]
+       (proteins key offset)))

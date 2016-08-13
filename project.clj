@@ -31,7 +31,9 @@
                  [clj-blast "0.2.7"]
                  [clj-interproscan "0.1.8"]
                  [http-kit "2.1.18"]
-                 [com.taoensso/sente "1.8.1"]]
+                 [com.taoensso/sente "1.8.1"]
+                 [secretary "1.2.3"]
+                 [venantius/accountant "0.1.7"]]
   :plugins [[cider/cider-nrepl "0.14.0-SNAPSHOT"]
             [lein-cljsbuild "1.1.3"]
             [lein-figwheel "0.5.4-7"]]
@@ -44,4 +46,4 @@
                         :compiler {:output-to "resources/public/js/app.js"
                                    :output-dir "resources/public/js/out"
                                    :main "jellydb.core"
-                                   :asset-path "js/out"}}]})
+                                   :asset-path "/js/out"}}]})

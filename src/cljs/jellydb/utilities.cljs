@@ -27,20 +27,11 @@
                     (str k ":" v " ")))
              (apply str)))))
 
-;; server calls
+;; errors
 
-(defn error-handler
-  [{:keys [status status-text]}]
-  (log (str "Something bad happened: " status " " status-text)))
-
-(defn post-params
-  [url params handler]
-  (POST url {:error-handler error-handler
-             :params params
-             :handler handler
-             :format :json
-             :response-format :json
-             :keywords? true}))
+(defn error-redirect
+  []
+  (set! js/window.location "/error"))
 
 ;; info control
 

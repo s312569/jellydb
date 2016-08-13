@@ -1,12 +1,15 @@
 (ns ^:figwheel-always jellydb.proteins
-  (:require [cljs.core.async :refer [put!]]
+  (:require-macros [cljs.core.async.macros :refer [go]])
+  (:require [cljs.core.async :refer [put! chan]]
             [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
             [cljs-http.client :as http]
             [jellydb.protein :as p]
-            [jellydb.search :refer [search]]
+            [jellydb.search :as ts]
             [jellydb.server :as serve]
-            [jellydb.utilities :as jdbu]))
+            [jellydb.utilities :as ut]
+            [secretary.core :as sec :refer-macros [defroute]]
+            [accountant.core :as acc]))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ;; server calls
@@ -445,13 +448,107 @@
 ;;     (render-state [_ state]
 ;;       (dom/div nil ""))))
 
-(defn proteins
-  [search owner]
-  (om/component
-   (dom/div nil search)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; navigation
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn ^:export init [search]
-  (om/root (partial proteins search)
-           nil
+(defn navigation
+  [_ owner]
+  )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; protein view control
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn get-search
+  [k o]
+  (serve/get-data {:type :search :key k}
+                  #(if (= :success (:status %))
+                     (om/set-state! o :search-data (:data %))
+                     (ut/error-redirect))))
+
+(defn get-proteins
+  [k off o]
+  (serve/get-data {:type :text-proteins :key k :offset off}
+                  #(if (= :success (:status %))
+                     (om/set-state! o :prots (:data %))
+                     (ut/error-redirect))))
+
+(defn search-report
+  [{:keys [data] :as search-data}]
+  (dom/div
+   #js {:className "pure-u-1-1"}
+   (if search-data
+     (dom/div
+      #js {:className "pure-u-1-1"}
+      (dom/p nil (str "Showing results for search '" data "'"))
+      (dom/hr nil))
+     "")))
+
+(defn prots-display
+  [prots]
+  (if-not prots
+    (dom/div
+     #js {:className "pure-u-1-1"}
+     (dom/div #js {:className "padded"} "")
+     (dom/div nil (dom/i #js {:className "fa fa-spinner fa-spin fa-3x"})))
+    (dom/div
+     #js {:className "pure-u-1-1"}
+     (str prots))))
+
+(defn search-box
+  []
+  (dom/div
+   #js {:className "pure-u-1-1"}
+   (dom/div
+    #js {:className "hdisplay hcenter"}
+    (om/build ts/search "New search ..."))))
+
+(defn proteins
+  [{:keys [key offset]} owner]
+  (reify
+    om/IInitState
+    (init-state [_]
+      {:search-data nil
+       :prots nil})
+    om/IWillMount
+    (will-mount [_]
+      (get-search key owner)
+      (get-proteins key offset owner))
+    om/IRenderState
+    (render-state [_ {:keys [search-data prots]}]
+      (dom/div
+       #js {:className "hcenter"}
+       (dom/div
+        #js {:style #js {:clear "both"}}
+        (dom/div #js {:className "padded"} "")
+        (dom/div
+         #js {:className "pure-g"}
+         (search-box)
+         (search-report search-data)
+         (prots-display prots)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; routing
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(acc/configure-navigation! {:nav-handler (fn [path]
+                                           (sec/dispatch! path))
+                            :path-exists? (fn [path]
+                                            (sec/locate-route path))})
+
+(defroute "/prots/:key/:offset" [key offset]
+  (js/console.log (str "User: " key))
+  (js/console.log offset)
+  (om/root proteins {:key key :offset (js/parseInt offset)}
+           {:target (. js/document (getElementById "t"))}))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; init
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn ^:export init [key]
+  (om/root proteins
+           {:key key :offset 0}
            {:target (. js/document (getElementById "t"))
             :shared @serve/app-state}))

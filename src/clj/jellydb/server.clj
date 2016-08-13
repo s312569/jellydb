@@ -100,7 +100,7 @@
 
 (defmulti save-data :type)
 
-(defmethod -event-msg-handler :biomarket.server/save
+(defmethod -event-msg-handler :jellydb.server/save
   [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
   (let [resp (save-data
               (assoc (:data ?data) :username (user-id ring-req) :type (:type ?data)))]
@@ -109,20 +109,17 @@
 
 (defmulti search-key :type)
 
-(defmethod -event-msg-handler :biomarket.server/search
+(defmethod -event-msg-handler :jellydb.server/search
   [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
-  (let [resp (search-key
-              (assoc (:data ?data) :username (user-id ring-req) :type (:type ?data)))]
+  (let [resp (search-key (assoc ?data :username (user-id ring-req)))]
     (when ?reply-fn
       (?reply-fn resp))))
 
 (defmulti get-data :type)
 
-(defmethod -event-msg-handler :biomarket.server/get
+(defmethod -event-msg-handler :jellydb.server/get
   [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
-  (let [resp (->> (get-data
-                   (assoc ?data :username (user-id ring-req) :type (:type ?data)))
-                  (broadcast-prep-data (user-id ring-req)))]
+  (let [resp (get-data (assoc ?data :username (user-id ring-req)))]
     (when ?reply-fn
       (?reply-fn resp))))
 

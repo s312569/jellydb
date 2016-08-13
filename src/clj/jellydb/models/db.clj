@@ -152,8 +152,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- query
-  [q type func]
-  (bdb/query-sequences dbspec q type :apply-func func))
+  ([q type] (query q type nil))
+  ([q type func]
+   (if func
+     (bdb/query-sequences dbspec q type :apply-func func)
+     (bdb/query-sequences dbspec q type))))
 
 (defmulti apply-to-dataset (fn [m] (:table m)))
 
@@ -174,6 +177,22 @@
 (defmethod insert-sequences :interproscan
   [table c]
   (bdb/insert-sequences! dbspec table :ips c))
+
+(defmulti count-results :type)
+
+(defmethod count-results :text
+  [{:keys [data] :as m}]
+  (query ["select count(*) from peptides where accession ILIKE ? OR description ILIKE ?"
+          (str "%" data "%") (str "%" data "%")]
+         :default #(-> (first %) :count)))
+
+(defmulti get-results :type)
+
+(defmethod get-results :text-proteins
+  [{:keys [data offset] :as m}]
+  (query ["select * from peptides where accession ILIKE ? OR description ILIKE ? order by accession OFFSET ? limit 20"
+          (str "%" data "%") (str "%" data "%") (+ offset 20)]
+         :peptide))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ;; construct peptides
@@ -378,15 +397,7 @@
 ;;                                            :def (blast/hit-def %)
 ;;                                            :hsps (hsps %)})))))})
 
-;; (defmethod return-results "text-search"
-;;   [{:keys [query offset]}]
-;;   {:status "success"
-;;    :proteins (ut/query-db (str "select acc from peps where "
-;;                                " acc ILIKE '%" query "%' OR "
-;;                                " description ILIKE '%" query "%' "
-;;                                " order by acc OFFSET "
-;;                                offset " limit 20")
-;;                           :row-fn #(get-pep (:acc %)))})
+
 
 ;; (defmethod return-results "ids-fetch"
 ;;   [{:keys [ids offset] :as m}]

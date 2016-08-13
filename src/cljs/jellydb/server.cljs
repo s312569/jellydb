@@ -58,7 +58,7 @@
     [::save m] 5000 rf)))
 
 (defn get-data
-  [owner {:keys [type] :as m} rf]
+  [{:keys [type] :as m} rf]
   ((:chsk-send! @app-state) [::get m] 5000 rf))
 
 (defn search-key

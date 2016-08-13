@@ -16,7 +16,8 @@
     (include-css "/css/proteins.css")
     (include-css "/css/buttons.css")
     (include-css "/css/loader.css")
-    (include-css "/css/home-links.css")]
+    (include-css "/css/home-links.css")
+    (include-css "/css/font-awesome-4.6.3/css/font-awesome.min.css")]
     [:body
      [:div {:id "layout"}
       [:div {:id "main"}

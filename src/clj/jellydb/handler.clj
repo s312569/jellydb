@@ -4,7 +4,7 @@
             [ring.util.response :refer [resource-response response content-type
                                         header]]
             [ring.middleware.json :as middleware]
-            [jellydb.models.db :as db]
+            [jellydb.models.webapi :as wa]
             [ring.middleware.defaults :refer [wrap-defaults site-defaults]]
             [jellydb.routes.home :refer [home-routes]]
             [jellydb.routes.proteins :refer [proteins-routes]]
@@ -36,6 +36,8 @@
   ;;            (content-type "application/octet-stream")
   ;;            (header "Content-Disposition"
   ;;                    "attachment; filename=sequences.fasta"))))
+  (GET "/error" [_]
+       "There was an error")
   (GET  "/chsk" req (:ring-ajax-get-or-ws-handshake @wss/websocket req))
   (POST "/chsk" req (:ring-ajax-post @wss/websocket req))
   (route/not-found "Not Found"))
