@@ -191,7 +191,7 @@
 (defmethod get-results :text-proteins
   [{:keys [data offset] :as m}]
   (query ["select * from peptides where accession ILIKE ? OR description ILIKE ? order by accession OFFSET ? limit 20"
-          (str "%" data "%") (str "%" data "%") (+ offset 20)]
+          (str "%" data "%") (str "%" data "%") offset]
          :peptide))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
