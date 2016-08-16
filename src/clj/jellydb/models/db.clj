@@ -2,7 +2,8 @@
   (:require [clojure.java.io :refer [reader]]
             [biodb.core :as bdb]
             [clj-fasta.core :refer [fasta-seq]]
-            [clojure.java.jdbc :as db]))
+            [clojure.java.jdbc :as db]
+            [clj-interproscan.core :as ips]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; spec
@@ -193,6 +194,22 @@
   (query ["select * from peptides where accession ILIKE ? OR description ILIKE ? order by accession OFFSET ? limit 20"
           (str "%" data "%") (str "%" data "%") offset]
          :peptide))
+
+(defmulti get-sequences :type)
+
+(defmethod get-sequences :jellydb.proteins/cds
+  [{:keys [accessions] :as m}]
+  (bdb/get-sequences dbspec :cdss :cds accessions))
+
+(defmethod get-sequences :jellydb.proteins/mrna
+  [{:keys [accessions]}]
+  (bdb/get-sequences dbspec :mrnas :mrna accessions))
+
+(defmethod get-sequences :jellydb.annotation-view/ips
+  [{:keys [accessions]}]
+  (vec (->> (bdb/get-sequences dbspec :interproscan :ips accessions)
+            first
+            ips/any-seq)))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ;; construct peptides

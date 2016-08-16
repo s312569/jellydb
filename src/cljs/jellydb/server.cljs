@@ -61,6 +61,12 @@
   [{:keys [type] :as m} rf]
   ((:chsk-send! @app-state) [::get m] 5000 rf))
 
+(defn get-data-check
+  [m t o]
+  (get-data m #(if (= :success (:status %))
+                 (om/set-state! o t (:data %))
+                 (ut/error-redirect))))
+
 (defn search-key
   [{:keys [type data] :as m} rf]
   ((:chsk-send! @app-state) [::search m] 5000 rf))

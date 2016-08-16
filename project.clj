@@ -29,7 +29,7 @@
                  [biodb "0.2.0"]
                  [clj-fasta "0.1.7"]
                  [clj-blast "0.2.7"]
-                 [clj-interproscan "0.1.8"]
+                 [clj-interproscan "0.2.0"]
                  [http-kit "2.1.18"]
                  [com.taoensso/sente "1.8.1"]
                  [secretary "1.2.3"]

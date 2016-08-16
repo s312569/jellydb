@@ -6,6 +6,7 @@
             [cljs-http.client :as http]
             [jellydb.search :as ts]
             [jellydb.server :as serve]
+            [jellydb.annotation-view :as ann]
             [jellydb.utilities :as ut]
             [secretary.core :as sec :refer-macros [defroute]]
             [accountant.core :as acc]))
@@ -163,6 +164,99 @@
 ;;                            "")})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; sequence views
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn- numbered-format [sequence]
+  (let [l (count sequence)
+        r (partition-all 70 (range 1 (+ 1 l)))
+        n (let [c (atom 0)]
+            (map #(->> (map (fn [x]
+                              (let [n (-> (swap! c (fn [x] (+ x 10)))
+                                          str
+                                          count)]
+                                (str (apply str (repeat (- 10 n) " "))
+                                     @c)))
+                            (partition 10 %))
+                       (apply str))
+                 r))
+        d (map #(->> (map (fn [x]
+                            (if (= 0 (mod x 10))
+                              "|" "-")) %)
+                     (apply str))
+               r)
+        s (->> (partition-all 70 sequence)
+               (map #(apply str %)))]
+    (->> (interleave n d s)
+         (interpose \newline)
+         (apply str))))
+
+(defn- fasta-format [{:keys [description sequence]}]
+  (str ">"
+       (->> (subs description 0 67)
+            (map #(apply str %))
+            (apply str))
+       "..."
+       \newline
+       (->> (partition-all 70 sequence)
+            (map #(apply str %))
+            (interpose \newline)
+            (apply str))))
+
+(defmulti get-sequence :type)
+
+(defmethod get-sequence ::protein
+  [{:keys [protein]} owner]
+  (om/set-state! owner :sequence (:sequence protein)))
+
+(defmethod get-sequence :default
+  [{:keys [protein type]} owner]
+  (serve/get-data {:accession (:accession protein) :type type}
+                  #(if (= :success (:status %))
+                     (om/set-state! owner :sequence (:sequence (:data %)))
+                     (ut/error-redirect))))
+
+(defn sequence-view [{:keys [protein type] :as m} owner]
+  (reify
+    om/IInitState
+    (init-state [_]
+      {:format :fasta
+       :sequence nil})
+    om/IWillMount
+    (will-mount [_]
+      (get-sequence m owner))
+    om/IWillReceiveProps
+    (will-receive-props [_ np]
+      (get-sequence np owner)
+      (om/set-state! owner :format :fasta))
+    om/IRenderState
+    (render-state [_ {:keys [format sequence]}]
+      (if-not sequence
+        (om/build ut/waiting nil)
+        (dom/div
+         #js {:className "tbpadded" :style #js {:text-align "left"}}
+         (dom/div
+          #js {:className "tbpadded"}
+          (dom/a #js {:onClick
+                      #(om/set-state! owner :format :fasta)
+                      :className
+                      (if (= format :fasta)
+                        "flinki" "flinka")}
+                 "Fasta")
+          "|"
+          (dom/a #js {:onClick
+                      #(om/set-state! owner :format :ladder)
+                      :className
+                      (if (= format :ladder)
+                        "flinki" "flinka")}
+                 "Numbered"))
+         (dom/pre
+          #js {:className "sequence-fixed"}
+          (if (= format :ladder)
+            (numbered-format sequence)
+            (fasta-format {:description (:description protein) :sequence sequence}))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; protein card
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -244,28 +338,34 @@
         (map (fn [[text tag]] (bottom-link text tag owner)) views)))))))
 
 (defn- bottom-view
-  [owner]
+  [protein owner]
   (let [visible (om/get-state owner :visible)]
-    (dom/div
-     #js {:className "pure-u-1-1"}
-     (dom/div
-      #js {:style #js {:position "relative"}}
-      (if-not (= visible :none)
+    (if (= visible :none)
+      (dom/div nil "")
+      (dom/div
+       #js {:className "pure-u-1-1"}
+       (dom/div
+        #js {:className "pure-u-1-24"} "")
+       (dom/div
+        #js {:className "pure-u-23-24"}
         (dom/div
-         #js {:style #js {:position "absolute" :top "15" :right "10" :color "#cad2d3"}}
-         (dom/a
-          #js {:onClick #(om/set-state! owner :visible :none)
-               :style #js {:cursor "pointer"}}
-          "Close")))
-      (condp = visible
-        :protein "protein"
-        :cds "cds"
-        :mrna "mrna"
-        :annotation "annotation"
-        :dataset "dataset"
-        :homology "homology"
-        :blast "blast"
-        nil)))))
+         #js {:style #js {:position "relative"}}
+         (if-not (= visible :none)
+           (dom/div
+            #js {:style #js {:position "absolute" :top "15" :right "10" :color "#cad2d3"}}
+            (dom/a
+             #js {:onClick #(om/set-state! owner :visible :none)
+                  :style #js {:cursor "pointer"}}
+             "Close")))
+         (condp = visible
+           :protein (om/build sequence-view {:protein protein :type ::protein})
+           :cds (om/build sequence-view {:protein protein :type ::cds})
+           :mrna (om/build sequence-view {:protein protein :type ::mrna})
+           :annotation (om/build ann/annotation-view protein)
+           :dataset "dataset"
+           :homology "homology"
+           :blast "blast"
+           nil)))))))
 
 (defn- protein [protein owner]
   (reify
@@ -288,7 +388,7 @@
         (protein-description protein)
         (protein-lower-info protein)
         (bottom-menu owner)
-        (bottom-view owner))))))
+        (bottom-view protein owner))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; navigation

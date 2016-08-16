@@ -1,13 +1,7 @@
 (ns jellydb.models.webapi
-  (:require [jellydb.models.blast :refer [blast-dataset]]
-            [jellydb.models.ips :as ip]
-            [jellydb.models.db :refer :all]
+  (:require [jellydb.models.db :refer :all]
             [jellydb.server :as serve]
-            [jellydb.models.utilities :as ut]
-            [biodb.core :as bdb]
-            [clj-fasta.core :refer [fasta->file]]
-            [me.raynes.fs :refer [delete delete-dir]]
-            [clj-commons-exec :refer [sh]]))
+            [jellydb.models.utilities :as ut]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; search keys
@@ -42,8 +36,22 @@
     {:status :failure :message "Something amiss in sequence retrieval."}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; text search
+;; sequence retrieval
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(derive :jellydb.proteins/cds :jellydb.proteins/dna)
+(derive :jellydb.proteins/mrna :jellydb.proteins/dna)
+
+(defmethod serve/get-data :jellydb.proteins/dna
+  [{:keys [accession] :as m}]
+  (if-let [r (get-sequences (assoc m :accessions [accession]))]
+    {:status :success :data (first r)}
+    {:status :failure :message "Something wrong with sequence retrieval by accession."}))
+
+(defmethod serve/get-data :jellydb.annotation-view/ips
+  [{:keys [accession] :as m}]
+  (if-let [r (get-sequences (assoc m :accessions [accession]))]
+    {:status :success :data r}
+    {:status :failure :message "Something wrong with sequence retrieval by accession."}))
 
 

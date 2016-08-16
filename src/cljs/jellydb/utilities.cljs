@@ -33,7 +33,25 @@
   []
   (set! js/window.location "/error"))
 
+;; components
+
+(defn waiting
+  [_ owner]
+  (om/component
+   (dom/div
+    #js {:style #js {:position "absolute" :top "50%" :left "50%"
+                     :-webkit-animation "fadein 2s"
+                     :-moz-animation "fadein 2s"
+                     :-ms-animation "fadein 2s"
+                     :-o-animation "fadein 2s"
+                     :animation "fadein 2s"}}
+    (dom/i #js {:className "fa fa-refresh fa-spin fa-fw"}))))
+
 ;; info control
+
+;;new
+
+;; old
 
 (defn pub-info
   ([owner topic data] (pub-info owner topic data nil))

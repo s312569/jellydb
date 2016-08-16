@@ -2,10 +2,7 @@
   (:require [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
             [jellydb.homology :refer [homology-view]]
-            [jellydb.sequence-views :refer [psview cdsview mrnaview]]
             [jellydb.dataset-view :refer [dataset-view]]
-            [jellydb.annotation-view :refer [process-ips process-gos
-                                             process-paths annotations]]
             [jellydb.blast-view :refer [blast-output-view]]
             [jellydb.utilities :as jdbu]))
 
