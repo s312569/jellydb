@@ -29,13 +29,12 @@
   ;; (POST "/search-info" req
   ;;       (let [p (:body req)]
   ;;         (response (db/search-data (merge p (get @db/req-key-map (:key p)))))))
-  ;; (GET "/fetch" [k]
-  ;;      (let [m (assoc (get @db/req-key-map k) :id k)]
-  ;;        (-> (db/return-file m)
-  ;;            response
-  ;;            (content-type "application/octet-stream")
-  ;;            (header "Content-Disposition"
-  ;;                    "attachment; filename=sequences.fasta"))))
+  (GET "/fetch" [k]
+       (-> (wa/dataset-sequences k)
+           response
+           (content-type "text/plain")
+           (header "Content-Disposition"
+                   "attachment; filename=sequences.fasta")))
   (GET "/error" [_]
        "There was an error")
   (GET  "/chsk" req (:ring-ajax-get-or-ws-handshake @wss/websocket req))

@@ -21,10 +21,9 @@
   (let [func #(doall
                (map
                 (fn [x]
-                  (let [tf (working-file (str (:name x)))]
-                    {:files (bl/blast % "blastp" (:file x) (working-file (:name x))
-                                      :params {"-max_target_seqs" "1"})
-                     :db x}))
+                  {:files (bl/blast % "blastp" (:file x) (working-file (:name x))
+                                    :params {"-max_target_seqs" "1"})
+                   :db x})
                 blast-dbs))
         blasts (apply-to-dataset {:table :peptides :func func :did did})]
     (doseq [{:keys [files db]} blasts]

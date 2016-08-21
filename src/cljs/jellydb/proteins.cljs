@@ -8,67 +8,11 @@
             [jellydb.server :as serve]
             [jellydb.annotation-view :as ann]
             [jellydb.utilities :as ut]
+            [jellydb.dataset-view :as data]
             [secretary.core :as sec :refer-macros [defroute]]
             [accountant.core :as acc]))
 
 (defonce app-state (atom {:offset 0 :key nil :selected []}))
-
-;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; ;; server calls
-;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; (defn- get-export-key
-;;   [owner type]
-;;   (let [h (fn [{:keys [status id msg]}]
-;;             (if (= "success" status)
-;;               (om/set-state! owner :ekey id)
-;;               (js/alert msg)))]
-;;     (if-let [ids (-> (om/get-state owner :selected) seq)]
-;;       (jdbu/post-params "/search-key" {:ids (vec ids) :type type} h)
-;;       (h {:status "fail" :msg "No sequences selected."}))))
-
-;; (defn- get-fasta-key
-;;   [owner type]
-;;   (let [h (fn [{:keys [status count id msg]}]
-;;             (if (= "success" status)
-;;               (do (om/set-state! owner :total count)
-;;                   (om/set-state! owner :key id))
-;;               (js/alert msg)))]
-;;     (if-let [ids (-> (om/get-state owner :selected) seq)]
-;;       (jdbu/post-params "/search-key" {:ids (vec ids) :type type} h)
-;;       (h {:status "fail" :msg "No sequences selected."}))))
-
-;; (defn- serve-proteins
-;;   [owner]
-;;   (let [o (om/get-state owner :start)
-;;         k (om/get-state owner :key)
-;;         h (fn [{:keys [status proteins]}]
-;;             (if (= "success" status)
-;;               (do (om/set-state! owner :proteins proteins)
-;;                   (om/set-state! owner :showing :proteins))
-;;               (throw (js/Error. "Can not initialise proteins."))))
-;;         params {:offset (- (* 20 o) 20) :key k}]
-;;     (jdbu/post-params "/proteins" params h)))
-
-;; (defn- search-info
-;;   [owner]
-;;   (let [k (om/get-state owner :key)
-;;         t (om/get-state owner :total)
-;;         h (fn [{:keys [status info]}]
-;;             (if (= "success" status)
-;;               (om/set-state! owner :search-info info)
-;;               (throw (js/Error. "Error in retrieving search information."))))]
-;;     (jdbu/post-params "/search-info" {:key k :total t} h)))
-
-;; (defn- select-all
-;;   [owner]
-;;   (let [k (om/get-state owner :key)
-;;         h (fn [{:keys [status info]}]
-;;             (if (= "success" status)
-;;               (do (om/set-state! owner :selected info)
-;;                   (jdbu/pub-info owner :all-done-done :done))
-;;               (throw (js/Error. "Error in retrieving search information."))))]
-;;     (jdbu/post-params "/select-all" {:key k} h)))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ;; export dropdown
@@ -232,7 +176,11 @@
     om/IRenderState
     (render-state [_ {:keys [format sequence]}]
       (if-not sequence
-        (om/build ut/waiting nil)
+        (dom/div
+         #js {:className "tbpadded" :style #js {:text-align "left"}}
+         (dom/div
+          #js {:className "tbpadded" :style #js {:text-align "left"}}
+          (om/build ut/waiting nil)))
         (dom/div
          #js {:className "tbpadded" :style #js {:text-align "left"}}
          (dom/div
@@ -306,23 +254,39 @@
                                           " ...")
                                      (:description protein)))))
 
+(defmulti menu-disabled? (fn [t o] t))
+
+(defmethod menu-disabled? :default
+  [_ _]
+  false)
+
+(defmethod menu-disabled? :annotation
+  [t o]
+  (not (om/get-state o :annotations?)))
+
 (defn- bottom-link
-  [text tag owner]
-  (let [cs (om/get-state owner :visible)]
+  [[text tag] owner]
+  (let [cs (om/get-state owner :visible)
+        dis? (menu-disabled? tag owner)]
     (dom/li
-     #js {:className (if (= cs tag)
-                       "pure-menu-item mselected "
-                       "pure-menu-item my-cursor")}
+     #js {:className (cond (= cs tag)
+                           "pure-menu-item mselected my-cursor"
+                           dis?
+                           "pure-menu-item pure-menu-disabled"
+                           :else
+                           "pure-menu-item my-cursor")}
      (dom/a
       #js {:className "pure-menu-link"
+           :disabled "true"
            :onClick (fn [x]
-                      (if (= tag cs)
-                        (om/set-state! owner :visible :none)
-                        (om/set-state! owner :visible tag)))}
+                      (and (not dis?)
+                           (if (= tag cs)
+                             (om/set-state! owner :visible :none)
+                             (om/set-state! owner :visible tag))))}
       text))))
 
 (defn- bottom-menu
-  [owner]
+  [protein owner]
   (let [views (om/get-state owner :views)]
     (dom/div
      #js {:className "pure-u-1-1"}
@@ -335,7 +299,7 @@
        (apply
         dom/ul
         #js {:className "pure-menu-list"}
-        (map (fn [[text tag]] (bottom-link text tag owner)) views)))))))
+        (map #(bottom-link % owner) views)))))))
 
 (defn- bottom-view
   [protein owner]
@@ -344,8 +308,8 @@
       (dom/div nil "")
       (dom/div
        #js {:className "pure-u-1-1"}
-       (dom/div
-        #js {:className "pure-u-1-24"} "")
+       ;; (dom/div
+       ;;  #js {:className "pure-u-1-24"} "")
        (dom/div
         #js {:className "pure-u-23-24"}
         (dom/div
@@ -362,7 +326,7 @@
            :cds (om/build sequence-view {:protein protein :type ::cds})
            :mrna (om/build sequence-view {:protein protein :type ::mrna})
            :annotation (om/build ann/annotation-view protein)
-           :dataset "dataset"
+           :dataset (om/build data/dataset-view protein)
            :homology "homology"
            :blast "blast"
            nil)))))))
@@ -372,9 +336,18 @@
     om/IInitState
     (init-state [_]
       {:visible :none
-       :views [["Protein" :protein] ["CDS" :cds] ["mRNA" :mrna]
-               ["Annotations" :annotation] ["Homologies" :homology]
-               ["Datasets" :dataset]]})
+       :views [["Protein" :protein]
+               ["CDS" :cds]
+               ["mRNA" :mrna]
+               ["Annotations" :annotation]
+               ["Homologies" :homology]
+               ["Datasets" :dataset]]
+       :annotations? false})
+    om/IWillMount
+    (will-mount [_]
+      (serve/get-data-check {:type ::annotations? :accession (:accession protein)}
+                            :annotations?
+                            owner))
     om/IWillReceiveProps
     (will-receive-props [_ np]
       (om/set-state! owner :visible :none))
@@ -387,7 +360,7 @@
         (protein-cb protein)
         (protein-description protein)
         (protein-lower-info protein)
-        (bottom-menu owner)
+        (bottom-menu protein owner)
         (bottom-view protein owner))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -401,29 +374,35 @@
     #js {:className "pure-u-1-1 padded"}
     (dom/div
      #js {:className "pure-u-1-2" :style #js {:text-align "left"}}
-     (dom/a #js {:style #js {:font-size "85%"}
-                 :className "pure-button"
-                 :disabled (if (= 0 offset) true false)
-                 :href (str "/prots/" key "/" 0)}
-            "<<")
-     (dom/a #js {:style #js {:font-size "85%"}
-                 :className "pure-button"
-                 :disabled (if (= 0 offset) true false)
-                 :href (str "/prots/" key "/" (- offset 20))}
-            "<")
+     (let [dis? (if (= 0 offset) true false)]
+       (dom/a #js {:style #js {:font-size "85%"}
+                   :className "pure-button"
+                   :disabled dis?
+                   :href (if dis? "#" (str "/prots/" key "/" 0))}
+              "<<"))
+     (let [dis? (if (= 0 offset) true false)]
+       (dom/a #js {:style #js {:font-size "85%"}
+                   :className "pure-button"
+                   :disabled dis?
+                   :href (if dis? "#" (str "/prots/" key "/" (- offset 20)))}
+              "<"))
      (dom/button #js {:className "buttondisplay"
                       :disabled "true"}
-                 (str (+ offset 1) " to " (+ offset 20) " of " count))
-     (dom/a #js {:style #js {:font-size "85%"}
-                 :className "pure-button"
-                 :disabled (if (>= (+ offset 20) count) true false)
-                 :href (str "/prots/" key "/" (+ offset 20))}
-            ">")
-    (dom/a #js {:style #js {:font-size "85%"}
-                :className "pure-button"
-                :disabled (if (>= (+ 20 offset) count) true false)
-                :href (str "/prots/" key "/" (* (quot count 20) 20))}
-           ">>"))
+                 (str (+ offset 1) " to "
+                      (if (> (+ offset 20) count) count (+ offset 20))
+                      " of " count))
+     (let [dis? (if (>= (+ offset 20) count) true false)]
+       (dom/a #js {:style #js {:font-size "85%"}
+                   :className "pure-button"
+                   :disabled dis?
+                   :href (if dis? "#" (str "/prots/" key "/" (+ offset 20)))}
+              ">"))
+     (let [dis? (if (>= (+ 20 offset) count) true false)]
+       (dom/a #js {:style #js {:font-size "85%"}
+                   :className "pure-button"
+                   :disabled dis?
+                   :href (if dis? "#" (str "/prots/" key "/" (* (quot count 20) 20)))}
+              ">>")))
     (dom/div #js {:className "pure-u-1-2" :style #js {:text-align "right"}}
              ;;(om/build export nil)
              "Export"))))

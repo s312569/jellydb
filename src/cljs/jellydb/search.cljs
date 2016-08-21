@@ -32,7 +32,7 @@
              #(if-not (= text "")
                 (do (om/set-state! owner :clicked true)
                     (serve/search-key {:type :text :data text}
-                                      (fn [x] (if (= "success" (:status x))
+                                      (fn [x] (if (= :success (:status x))
                                                 (om/set-state! owner :skey (:key x))
                                                 (ut/error-redirect))))))}
         (if clicked

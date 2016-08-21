@@ -27,7 +27,7 @@
   (bdb/create-table! dbspec :mrnas :mrna)
   (bdb/create-table! dbspec :cdss :cds)
   (bdb/create-table! dbspec :contigs :contig)
-  (bdb/create-table! dbspec :blasts :blast)
+  (bdb/create-table! dbspec :blasts :jdb-blast)
   (bdb/create-table! dbspec :interproscan :ips))
 
 (defn delete-database
@@ -81,7 +81,7 @@
           [:name :varchar "NOT NULL"]
           [:type :text "NOT NULL"]
           [:abstract :text "NOT NULL"]
-          [:submitter :varchar "NOT NULL"]
+          [:submitter :integer "NOT NULL"]
           [:time :timestamp "NOT NULL" "DEFAULT CURRENT_TIMESTAMP"]
           [:species :varchar "NOT NULL"]))
 
@@ -137,13 +137,13 @@
 
 ;; blasts
 
-(defmethod bdb/table-spec :blast
+(defmethod bdb/table-spec :jdb-blast
   [q]
   (vector [:accession :text "PRIMARY KEY"]
           [:database :text "NOT NULL"]
           [:hit :text "NOT NULL"]))
 
-(defmethod bdb/prep-sequences :blast
+(defmethod bdb/prep-sequences :jdb-blast
   [q]
   (->> (:coll q)
        (map #(assoc % :hit (pr-str (:hit %))))))
@@ -159,7 +159,7 @@
      (bdb/query-sequences dbspec q type :apply-func func)
      (bdb/query-sequences dbspec q type))))
 
-(defmulti apply-to-dataset (fn [m] (:table m)))
+(defmulti apply-to-dataset :table)
 
 (defmethod apply-to-dataset :peptides
   [{:keys [table func did] :as m}]
@@ -169,11 +169,19 @@
   [{:keys [table func did] :as m}]
   (query ["select * from contigs where dataset=?" did] :contig func))
 
+(defmethod apply-to-dataset :mrnas
+  [{:keys [table func did] :as m}]
+  (query ["select * from mrnas where dataset=?" did] :contig func))
+
+(defmethod apply-to-dataset :cdss
+  [{:keys [table func did] :as m}]
+  (query ["select * from cdss where dataset=?" did] :contig func))
+
 (defmulti insert-sequences (fn [table c] table))
 
 (defmethod insert-sequences :blasts
   [table c]
-  (bdb/insert-sequences! dbspec table :blast c))
+  (bdb/insert-sequences! dbspec table :jdb-blast c))
 
 (defmethod insert-sequences :interproscan
   [table c]
@@ -187,15 +195,13 @@
           (str "%" data "%") (str "%" data "%")]
          :default #(-> (first %) :count)))
 
-(defmulti get-results :type)
+(defmulti get-sequences :type)
 
-(defmethod get-results :text-proteins
+(defmethod get-sequences :text-proteins
   [{:keys [data offset] :as m}]
   (query ["select * from peptides where accession ILIKE ? OR description ILIKE ? order by accession OFFSET ? limit 20"
           (str "%" data "%") (str "%" data "%") offset]
          :peptide))
-
-(defmulti get-sequences :type)
 
 (defmethod get-sequences :jellydb.proteins/cds
   [{:keys [accessions] :as m}]
@@ -210,6 +216,11 @@
   (vec (->> (bdb/get-sequences dbspec :interproscan :ips accessions)
             first
             ips/any-seq)))
+
+(defmethod get-sequences :jellydb.dataset-view/dataset
+  [{:keys [dataset] :as m}]
+  (query ["select d.id,d.name,d.type,d.abstract,d.submitter,d.time,d.species,s.first,s.last,s.email,s.address from datasets d, submitters s where d.submitter = s.id and d.id=?" dataset]
+         :jdb-blast))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ;; construct peptides

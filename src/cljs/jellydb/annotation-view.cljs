@@ -7,226 +7,221 @@
 
 ;; drawing annotations
 
-;; (defn- draw [intervals l]
-;;   (q/smooth)
-;;   (q/background 255 255 255)
-;;   (q/no-stroke)
-;;   (let [line-width 900
-;;         ym (* (q/width) 0.01)
-;;         xm (* (q/height) 0.05)
-;;         h (* (q/height) 0.90)
-;;         w (* (q/width) 0.98)]
-;;     (q/fill 113 142 164 80)
-;;     (q/rect xm ym w h)
-;;     (q/fill 113 142 164)
-;;     (doseq [[s e] intervals]
-;;       (let [wp (/ s l)
-;;             fx (+ (* w wp) ym)
-;;             fw (* (/ (- e s) l) w)]
-;;         (q/rect fx ym (if (< fw 1) 1 fw) h)))))
+(defn- draw [locations l]
+  (q/smooth)
+  (q/background 255 255 255)
+  (q/no-stroke)
+  (let [line-width 900
+        ym (* (q/width) 0.01)
+        xm (* (q/height) 0.05)
+        h (* (q/height) 0.90)
+        w (* (q/width) 0.98)]
+    (q/fill 113 142 164 80)
+    (q/rect xm ym w h)
+    (q/fill 113 142 164)
+    (doseq [{:keys [start end]} locations]
+      (let [wp (/ start l)
+            fx (+ (* w wp) ym)
+            fw (* (/ (- end start) l) w)]
+        (q/rect fx ym (if (< fw 1) 1 fw) h)))))
 
-;; (defn- init-sketch [{:keys [id intervals sequence]}]
-;;   (q/sketch
-;;    :draw (fn [] (draw intervals (count sequence)))
-;;    :host id
-;;    :size [100 20]))
+(defn- init-sketch [{:keys [ac locations seq-length] :as m}]
+  (q/sketch
+   :draw (fn [] (draw locations seq-length))
+   :host ac
+   :size [100 20]))
 
 ;; ;; components
 
-;; (defn- anno-link [ips owner]
-;;   (reify
-;;     om/IInitState
-;;     (init-state [_]
-;;       {:url (condp = (:library (:library ips))
-;;               "PFAM" "http://pfam.xfam.org/family/"
-;;               "GO Term" "https://www.ebi.ac.uk/QuickGO/GTerm?id="
-;;               "Reactome" "http://www.reactome.org/content/detail/"
-;;               "MetaCyc" "http://biocyc.org/META/NEW-IMAGE?type=PATHWAY&object="
-;;               "KEGG" "http://www.genome.jp/kegg-bin/show_pathway?ec"
-;;               "PANTHER" "http://www.pantherdb.org/panther/family.do?clsAccession="
-;;               "PROSITE_PROFILES" "http://prosite.expasy.org/"
-;;               "SUPERFAMILY"
-;;               "http://supfam.cs.bris.ac.uk/SUPERFAMILY/cgi-bin/scop.cgi?ipid="
-;;               nil)})
-;;     om/IRenderState
-;;     (render-state [_ {:keys [url]}]
-;;       (if url
-;;         (dom/a #js {:href (str url (:accession ips))
-;;                     :target "_blank"}
-;;                (:accession ips))
-;;         (dom/div nil (if (re-find #"^(TMhelix)" (:accession ips))
-;;                        "TMhelix"
-;;                        (:accession ips)))))))
+(defn- annotation-link [ips owner]
+  (reify
+    om/IInitState
+    (init-state [_]
+      {:url (condp = (get-in ips [:signature :library :library])
+              "PFAM" "http://pfam.xfam.org/family/"
+              "GO Term" "https://www.ebi.ac.uk/QuickGO/GTerm?id="
+              "Reactome" "http://www.reactome.org/content/detail/"
+              "MetaCyc" "http://biocyc.org/META/NEW-IMAGE?type=PATHWAY&object="
+              "KEGG" "http://www.genome.jp/kegg-bin/show_pathway?ec"
+              "PANTHER" "http://www.pantherdb.org/panther/family.do?clsAccession="
+              "PROSITE_PROFILES" "http://prosite.expasy.org/"
+              "SUPERFAMILY" "http://supfam.cs.bris.ac.uk/SUPERFAMILY/cgi-bin/scop.cgi?ipid="
+              nil)})
+    om/IRenderState
+    (render-state [_ {:keys [url]}]
+      (let [acc (get-in ips [:signature :ac])]
+        (if url
+          (dom/a #js {:href (str url acc)
+                      :target "_blank"}
+                 acc)
+          (dom/div nil acc))))))
 
-;; (defn- anno-th [name owner]
-;;   (om/component
-;;    (dom/th #js {:className "anno-display"} name)))
+(defn- anno-th [name owner]
+  (om/component
+   (dom/th #js {:className "anno-display"} name)))
 
-;; (defn- anno-header [fields owner]
-;;   (om/component
-;;    (apply dom/tr
-;;           nil
-;;           (om/build-all anno-th fields))))
+(defn- annotation-tds
+  [{:keys [link database signature host canvas sketch]} owner]
+  (reify
+    om/IDidMount
+    (did-mount [_]
+      (init-sketch sketch))
+    om/IRenderState
+    (render-state [_ _]
+      (dom/tr
+       nil
+       (dom/td #js {:className "anno-display"
+                    :style #js {:width "20%"}}
+               link)
+       (dom/td #js {:className "anno-display"
+                    :style #js {:width "15%"}}
+               database)
+       (dom/td #js {:className "anno-display"
+                    :style #js {:width "50%"}}
+               signature)
+       (dom/td #js {:className "anno-display"
+                    :style #js {:width "15%"}
+                    :title "Title"}
+               canvas)))))
 
-;; (defn- anno-td [data owner]
-;;   (om/component
-;;    (dom/tr nil
-;;            (dom/td #js {:className "anno-display"
-;;                         :style #js {:width "20%"}}
-;;                    (first data))
-;;            (dom/td #js {:className "anno-display"
-;;                         :style #js {:width "15%"}}
-;;                    (second data))
-;;            (dom/td #js {:className "anno-display"
-;;                         :style #js {:width "50%"}}
-;;                    (nth data 2))
-;;            (dom/td #js {:className "anno-display"
-;;                         :style #js {:width "15%"}
-;;                         :title (str (nth data 3))}
-;;                    (last data)))))
+(defn- render-annotations
+  [{:keys [headers description data]}]
+  (dom/div
+   nil
+   (dom/div #js {:className "pure-u-5-5 thick hcenter greyed"} description)
+   (dom/div
+    #js {:className "pure-u-5-5 tbpadded"}
+    (dom/table
+     nil
+     (dom/thead nil (apply dom/tr nil (om/build-all anno-th headers)))
+     (apply
+      dom/tbody
+      nil
+      (om/build-all annotation-tds data))))))
 
-;; (defn- anno-data [ips owner]
-;;   (reify
-;;     om/IInitState
-;;     (init-state [_]
-;;       {:ips ips})
-;;     om/IDidMount
-;;     (did-mount [_]
-;;       (init-sketch (om/get-state owner :ips)))
-;;     om/IRenderState
-;;     (render-state [_ {:keys [ips]}]
-;;       (om/build anno-td (:data ips)))))
+(defmulti annotation-desc (fn [i] (get-in i [:signature :library :library])))
 
-;; (defn- anno-display [ips owner]
-;;   (reify
-;;     om/IInitState
-;;     (init-state [_]
-;;       {:ips ips})
-;;     om/IRenderState
-;;     (render-state [_ {:keys [ips]}]
-;;       (if (seq ips)
-;;         (dom/div
-;;          nil
-;;          (dom/div #js {:className "pure-u-5-5 thick hcenter greyed"}
-;;                   (:type (first ips)))
-;;          (dom/div
-;;           #js {:className "pure-u-5-5 tbpadded"}
-;;           (dom/table
-;;            nil
-;;            (dom/thead nil
-;;                       (om/build anno-header (:headers (first ips))))
-;;            (apply dom/tbody nil (om/build-all anno-data ips)))))))))
+(defmethod annotation-desc :default
+  [i]
+  (get-in i [:signature :entry :desc]))
 
-;; ;; protein display
+(defmethod annotation-desc "SUPERFAMILY"
+  [i]
+  (get-in i [:signature :name]))
 
-;; (defn- intervals? [i]
-;;   (if (> (count i) 1)
-;;     "Intervals" "Interval"))
+(defmethod annotation-desc "PFAM"
+  [i]
+  (get-in i [:signature :desc]))
 
-;; (defn process-ips [peptide]
-;;   (map #(hash-map :sequence (:sequence peptide)
-;;                   :accession (:accession %)
-;;                   :id (str (:acc peptide) "-" (:accession %))
-;;                   :intervals (:intervals %)
-;;                   :headers (list "Accession" "Database"
-;;                                  "Signature" (intervals? (:intervals %)))
-;;                   :data (list (om/build anno-link %)
-;;                               (:library (:library %))
-;;                               (:signature %)
-;;                               (->> (map (fn [x]
-;;                                           (str (first x) "-" (second x)))
-;;                                         (:intervals %))
-;;                                    (interpose "; ")
-;;                                    (apply str))
-;;                               (dom/canvas
-;;                                #js {:id (str (:acc peptide) "-" (:accession %))
-;;                                     :width "100" :height "30"}))
-;;                   :type "Annotations")
-;;        (:ips-data (:ips peptide))))
+(defmulti annotations-data (fn [m] (get-in m [:signature :library :library])))
 
-;; (defn process-gos [peptide]
-;;   (map (fn [x]
-;;          {:sequence (:sequence peptide)
-;;           :accession (:go-accession x)
-;;           :id (str (:acc peptide) "-" (:go-accession x))
-;;           :intervals (:intervals x)
-;;           :type "GO Terms"
-;;           :headers (list "Accession" "Component" "Name"
-;;                          (intervals? (:intervals x)))
-;;           :data (list
-;;                  (om/build anno-link
-;;                            {:accession (:go-accession x)
-;;                             :library {:library "GO Term"}})
-;;                  (condp = (:component x)
-;;                    "MOLECULAR_FUNCTION" "MF"
-;;                    "CELLULAR_COMPONENT" "CC"
-;;                    "BIOLOGICAL_PROCESS" "BP")
-;;                  (:name x)
-;;                  (->> (map (fn [x]
-;;                              (str (first x) "-" (second x)))
-;;                            (:intervals x))
-;;                       (interpose "; ")
-;;                       (apply str))
-;;                  (dom/canvas
-;;                   #js {:id (str (:acc peptide) "-" (:go-accession x))
-;;                        :width "100" :height "30"}))})
-;;        (:go-terms (:ips peptide))))
+(defmethod annotations-data :default
+  [i]
+  (let [host (str (get-in i [:signature :ac]) "-" (gensym))]
+    {:link (om/build annotation-link i)
+     :database (get-in i [:signature :library :library])
+     :signature (annotation-desc i)
+     :sketch {:ac host :locations (:locations i)
+              :seq-length (:sl i)}
+     :canvas (dom/canvas #js {:id host :width "100" :height "30"})}))
 
-;; (defn process-paths [peptide]
-;;   (map (fn [x]
-;;          {:sequence (:sequence peptide)
-;;           :accession (:path-accession x)
-;;           :id (str (:acc peptide) "-" (:path-accession x))
-;;           :intervals (:intervals x)
-;;           :type "Pathways"
-;;           :headers (list "Accession" "Database" "Name"
-;;                          (intervals? (:intervals x)))
-;;           :data (list
-;;                  (om/build anno-link
-;;                            {:accession (:path-accession x)
-;;                             :library {:library (:db x)}})
-;;                  (:db x)
-;;                  (:name x)
-;;                  (->> (map (fn [x]
-;;                              (str (first x) "-" (second x)))
-;;                            (:intervals x))
-;;                       (interpose "; ")
-;;                       (apply str))
-;;                  (dom/canvas
-;;                   #js {:id (str (:acc peptide) "-" (:path-accession x))
-;;                        :width "100" :height "30"}))})
-;;        (:pathways (:ips peptide))))
+(defmethod annotations-data "TMHMM"
+  [i]
+  (let [host (str (get-in i [:signature :ac]) "-" (gensym))]
+      {:link "TMHelix"
+       :database "TMHMM"
+       :signature "Trans-membrane helix"
+       :sketch {:ac host :locations (:locations i)
+                :seq-length (:sl i)}
+       :canvas (dom/canvas #js {:id host :width "100" :height "30"})}))
 
-;; (defn annotations [annos owner]
-;;   (om/component
-;;    (dom/div
-;;     #js {:className "annopadded"}
-;;     (if (seq (:ips annos))
-;;       (om/build anno-display (:ips annos)))
-;;     (if (seq (:gos annos))
-;;       (om/build anno-display (:gos annos)))
-;;     (if (seq (:paths annos))
-;;       (om/build anno-display (:paths annos))))))
+(defn annotations
+  [{:keys [protein ipss]} owner]
+  (reify
+    om/IInitState
+    (init-state [_]
+      (if (seq ipss)
+        (let [sl (count (:sequence protein))]
+          {:headers ["Accession" "Database" "Signature" "Interval(s)"]
+           :description "Annotations"
+           :data (map annotations-data (map #(assoc % :sl sl) ipss))})
+        {}))
+    om/IRenderState
+    (render-state [_ m]
+      (if (:data m) (render-annotations m)))))
 
-;; (defn- anno-display [ips owner]
-;;   (reify
-;;     om/IInitState
-;;     (init-state [_]
-;;       {:ips ips})
-;;     om/IRenderState
-;;     (render-state [_ {:keys [ips]}]
-;;       (if (seq ips)
-;;         (dom/div
-;;          nil
-;;          (dom/div #js {:className "pure-u-5-5 thick hcenter greyed"}
-;;                   (:type (first ips)))
-;;          (dom/div
-;;           #js {:className "pure-u-5-5 tbpadded"}
-;;           (dom/table
-;;            nil
-;;            (dom/thead nil
-;;                       (om/build anno-header (:headers (first ips))))
-;;            (apply dom/tbody nil (om/build-all anno-data ips)))))))))
+(defn go-terms
+  [{:keys [protein ipss]} owner]
+  (reify
+    om/IInitState
+    (init-state [_]
+      (let [gos (->> (mapcat #(let [l (map (fn [x] (select-keys x [:start :end]))
+                                           (:locations %))
+                                    gs (get-in % [:signature :entry :gos])]
+                                (map (fn [x] (assoc x :locations l)) gs))
+                             ipss)
+                     frequencies
+                     keys)]
+        (if (seq gos)
+          {:headers ["Accession" "Component" "Name" "Interval(s)"]
+           :description "GO Terms"
+           :data
+           (map (fn [i]
+                  (ut/log i)
+                  (let [host (str (gensym) "-" (:id i))]
+                    {:link
+                     (dom/a
+                      #js {:href (str "https://www.ebi.ac.uk/QuickGO/GTerm?id=" (:id i))
+                           :target "_blank"}
+                      (:id i))
+                     :database (condp = (:category i)
+                                 "MOLECULAR_FUNCTION" "MF"
+                                 "CELLULAR_COMPONENT" "CC"
+                                 "BIOLOGICAL_PROCESS" "BP")
+                     :signature (:name i)
+                     :sketch {:ac host :locations (:locations i)
+                              :seq-length (count (:sequence protein))}
+                     :canvas (dom/canvas #js {:id host :width "100" :height "30"})}))
+                gos)}
+          {})))
+    om/IRenderState
+    (render-state [_ m]
+      (if (:data m) (render-annotations m)))))
+
+(defn pathways
+  [{:keys [protein ipss]} owner]
+  (reify
+    om/IInitState
+    (init-state [_]
+      (let [ps (->> (mapcat #(let [l (map (fn [x] (select-keys x [:start :end]))
+                                          (:locations %))
+                                   gs (get-in % [:signature :entry :pathways])]
+                               (map (fn [x] (assoc x :locations l)) gs))
+                            ipss)
+                    frequencies
+                    keys)]
+        (if (seq ps)
+          {:headers ["Accession" "Database" "Name" "Interval(s)"]
+           :description "Pathways"
+           :data (map (fn [i]
+                        (let [host (str (:ac i) "-" (:id i))]
+                          {:link (om/build annotation-link {:signature
+                                                            {:library {:library (:db i)}
+                                                             :ac (:id i)}})
+                           :database (:db i)
+                           :signature (:name i)
+                           :sketch {:ac host :locations (:locations i)
+                                    :seq-length (count (:sequence protein))}
+                           :canvas (dom/canvas #js {:id host :width "100" :height "30"})}))
+                      ps)}
+          {})))
+    om/IRenderState
+    (render-state [_ m]
+      (if (:data m) (render-annotations m)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; api
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn annotation-view
   [protein owner]
@@ -246,9 +241,17 @@
     om/IRenderState
     (render-state [_ {:keys [ips accession]}]
       (if-not ips
-        (om/build ut/waiting nil)
         (dom/div
          #js {:className "tbpadded" :style #js {:text-align "left"}}
          (dom/div
-          #js {:className "tbpadded"}
-          (str ips)))))))
+          #js {:className "tbpadded" :style #js {:text-align "left"}}
+          (om/build ut/waiting nil)))
+        (dom/div
+         #js {:className "tbpadded" :style #js {:text-align "left"}}
+         (dom/div #js {:className "tbpadded"} "")
+         (dom/div #js {:className "tbpadded"} "")
+         (dom/div
+          #js {:className "tbpadded" :style #js {:text-align "left"}}
+          (om/build annotations {:protein protein :ipss ips})
+          (om/build go-terms {:protein protein :ipss ips})
+          (om/build pathways {:protein protein :ipss ips})))))))
