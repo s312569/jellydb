@@ -3,7 +3,8 @@
             [biodb.core :as bdb]
             [clj-fasta.core :refer [fasta-seq]]
             [clojure.java.jdbc :as db]
-            [clj-interproscan.core :as ips]))
+            [clj-interproscan.core :as ips]
+            [clojure.edn :as edn]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; spec
@@ -139,7 +140,8 @@
 
 (defmethod bdb/table-spec :jdb-blast
   [q]
-  (vector [:accession :text "PRIMARY KEY"]
+  (vector [:id :serial "PRIMARY KEY"]
+          [:accession :text "NOT NULL"]
           [:database :text "NOT NULL"]
           [:hit :text "NOT NULL"]))
 
@@ -147,6 +149,10 @@
   [q]
   (->> (:coll q)
        (map #(assoc % :hit (pr-str (:hit %))))))
+
+(defmethod bdb/restore-sequence :jdb-blast
+  [q]
+  (assoc (dissoc q :type) :hit (edn/read-string (:hit q))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; utilities
@@ -221,6 +227,11 @@
   [{:keys [dataset] :as m}]
   (query ["select d.id,d.name,d.type,d.abstract,d.submitter,d.time,d.species,s.first,s.last,s.email,s.address from datasets d, submitters s where d.submitter = s.id and d.id=?" dataset]
          :jdb-blast))
+
+(defmethod get-sequences :jellydb.homology-view/blasts
+  [{:keys [accessions] :as m}]
+  (bdb/get-sequences dbspec :blasts :jdb-blast accessions
+                     :apply-func #(group-by :database %)))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ;; construct peptides

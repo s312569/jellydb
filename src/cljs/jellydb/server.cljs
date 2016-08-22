@@ -65,7 +65,7 @@
   [m t o]
   (get-data m #(if (= :success (:status %))
                  (om/set-state! o t (:data %))
-                 (ut/error-redirect))))
+                 (ut/error-redirect %))))
 
 (defn search-key
   [{:keys [type data] :as m} rf]

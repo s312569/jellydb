@@ -30,8 +30,8 @@
 ;; errors
 
 (defn error-redirect
-  []
-  (set! js/window.location "/error"))
+  [m]
+  (set! js/window.location (str "/error?m=" (:message m))))
 
 ;; components
 

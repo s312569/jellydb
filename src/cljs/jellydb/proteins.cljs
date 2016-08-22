@@ -9,6 +9,7 @@
             [jellydb.annotation-view :as ann]
             [jellydb.utilities :as ut]
             [jellydb.dataset-view :as data]
+            [jellydb.homology-view :refer [homology-view]]
             [secretary.core :as sec :refer-macros [defroute]]
             [accountant.core :as acc]))
 
@@ -158,7 +159,7 @@
   (serve/get-data {:accession (:accession protein) :type type}
                   #(if (= :success (:status %))
                      (om/set-state! owner :sequence (:sequence (:data %)))
-                     (ut/error-redirect))))
+                     (ut/error-redirect %))))
 
 (defn sequence-view [{:keys [protein type] :as m} owner]
   (reify
@@ -176,15 +177,11 @@
     om/IRenderState
     (render-state [_ {:keys [format sequence]}]
       (if-not sequence
+        (om/build ut/waiting nil)
         (dom/div
-         #js {:className "tbpadded" :style #js {:text-align "left"}}
+         nil
          (dom/div
-          #js {:className "tbpadded" :style #js {:text-align "left"}}
-          (om/build ut/waiting nil)))
-        (dom/div
-         #js {:className "tbpadded" :style #js {:text-align "left"}}
-         (dom/div
-          #js {:className "tbpadded"}
+          nil
           (dom/a #js {:onClick
                       #(om/set-state! owner :format :fasta)
                       :className
@@ -321,15 +318,19 @@
              #js {:onClick #(om/set-state! owner :visible :none)
                   :style #js {:cursor "pointer"}}
              "Close")))
-         (condp = visible
-           :protein (om/build sequence-view {:protein protein :type ::protein})
-           :cds (om/build sequence-view {:protein protein :type ::cds})
-           :mrna (om/build sequence-view {:protein protein :type ::mrna})
-           :annotation (om/build ann/annotation-view protein)
-           :dataset (om/build data/dataset-view protein)
-           :homology "homology"
-           :blast "blast"
-           nil)))))))
+         (dom/div
+          #js {:className "tbpadded" :style #js {:text-align "left"}}
+          (dom/div
+           #js {:className "tbpadded" :style #js {:text-align "left"}}
+           (condp = visible
+             :protein (om/build sequence-view {:protein protein :type ::protein})
+             :cds (om/build sequence-view {:protein protein :type ::cds})
+             :mrna (om/build sequence-view {:protein protein :type ::mrna})
+             :annotation (om/build ann/annotation-view protein)
+             :dataset (om/build data/dataset-view protein)
+             :homology (om/build homology-view protein)
+             :blast "blast"
+             nil)))))))))
 
 (defn- protein [protein owner]
   (reify
@@ -416,7 +417,7 @@
   (serve/get-data {:type :text-proteins :key key :offset offset}
                   #(if (= :success (:status %))
                      (om/set-state! owner :prots (:data %))
-                     (ut/error-redirect))))
+                     (ut/error-redirect %))))
 
 (defn search-report
   [{:keys [search] :as search-data}]
@@ -499,7 +500,7 @@
                      (reset! app-state {:offset 0 :key key :selected []
                                         :count (:count (:data %))
                                         :search (:data (:data %))})
-                     (ut/error-redirect))))
+                     (ut/error-redirect %))))
 
 (defn ^:export init [key]
   (get-search key)

@@ -242,16 +242,14 @@
     (render-state [_ {:keys [ips accession]}]
       (if-not ips
         (dom/div
-         #js {:className "tbpadded" :style #js {:text-align "left"}}
-         (dom/div
-          #js {:className "tbpadded" :style #js {:text-align "left"}}
-          (om/build ut/waiting nil)))
+         nil
+         (dom/div #js {:className "tbpadded"} "")
+         (dom/div #js {:className "tbpadded"} "")
+         (om/build ut/waiting nil))
         (dom/div
-         #js {:className "tbpadded" :style #js {:text-align "left"}}
+         nil
          (dom/div #js {:className "tbpadded"} "")
          (dom/div #js {:className "tbpadded"} "")
-         (dom/div
-          #js {:className "tbpadded" :style #js {:text-align "left"}}
-          (om/build annotations {:protein protein :ipss ips})
-          (om/build go-terms {:protein protein :ipss ips})
-          (om/build pathways {:protein protein :ipss ips})))))))
+         (om/build annotations {:protein protein :ipss ips})
+         (om/build go-terms {:protein protein :ipss ips})
+         (om/build pathways {:protein protein :ipss ips}))))))

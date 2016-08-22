@@ -31,7 +31,6 @@
 
 (defmethod serve/search-key :jellydb.dataset-view/dataset
   [{:keys [table did] :as m}]
-  (println m)
   (new-key {:type :dataset-retrieval :table table :did did}))
 
 (defn- jdb-fasta-string
@@ -80,7 +79,7 @@
   [{:keys [accession] :as m}]
   (if-let [r (get-sequences (assoc m :accessions [accession]))]
     {:status :success :data r}
-    {:status :failure :message "Something wrong with sequence retrieval by accession."}))
+    {:status :failure :message "Something wrong with ips retrieval by accession."}))
 
 (defmethod serve/get-data :jellydb.proteins/annotations?
   [{:keys [accession] :as m}]
@@ -93,3 +92,9 @@
   (if-let [r (get-sequences m)]
     {:status :success :data (first r)}
     {:status :failure :message "Something wrong with dataset retrieval."}))
+
+(defmethod serve/get-data :jellydb.homology-view/blasts
+  [{:keys [accession] :as m}]
+  (if-let [r (get-sequences (assoc m :accessions [accession]))]
+    {:status :success :data r}
+    {:status :failure :message "Something wrong with blast retrieval by accession."}))

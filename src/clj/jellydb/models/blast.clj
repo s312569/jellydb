@@ -11,7 +11,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (def blast-dbs [{:file "/home/jason/Dropbox/jellydb/resources/blast/test.fasta"
-                 :name "test"
+                 :name "Test"
                  :id-parse #(if (re-find #"^gnl\|" %)
                               (second (split % #"\|" 2))
                               %)}])

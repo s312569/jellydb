@@ -34,8 +34,7 @@
                  [com.taoensso/sente "1.8.1"]
                  [secretary "1.2.3"]
                  [venantius/accountant "0.1.7"]]
-  :plugins [[cider/cider-nrepl "0.14.0-SNAPSHOT"]
-            [lein-cljsbuild "1.1.3"]
+  :plugins [[lein-cljsbuild "1.1.3"]
             [lein-figwheel "0.5.4-7"]]
   :clean-targets ^{:protect false} ["resources/public/js/out"
                                     "resources/public/js/app.js"]

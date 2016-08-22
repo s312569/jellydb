@@ -35,8 +35,10 @@
            (content-type "text/plain")
            (header "Content-Disposition"
                    "attachment; filename=sequences.fasta")))
-  (GET "/error" [_]
-       "There was an error")
+  (GET "/error" [m]
+       (do
+         (println m)
+         (str "There was an error:" m)))
   (GET  "/chsk" req (:ring-ajax-get-or-ws-handshake @wss/websocket req))
   (POST "/chsk" req (:ring-ajax-post @wss/websocket req))
   (route/not-found "Not Found"))

@@ -34,7 +34,7 @@
                     (serve/search-key {:type :text :data text}
                                       (fn [x] (if (= :success (:status x))
                                                 (om/set-state! owner :skey (:key x))
-                                                (ut/error-redirect))))))}
+                                                (ut/error-redirect x))))))}
         (if clicked
           (dom/i #js {:className "fa fa-spinner fa-spin" :aria-hidden "true"})
           "Go"))))))
