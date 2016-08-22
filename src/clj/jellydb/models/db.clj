@@ -155,59 +155,28 @@
   (assoc (dissoc q :type) :hit (edn/read-string (:hit q))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; utilities
+;; getting sequences
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn- query
-  ([q type] (query q type nil))
-  ([q type func]
-   (if func
-     (bdb/query-sequences dbspec q type :apply-func func)
-     (bdb/query-sequences dbspec q type))))
-
-(defmulti apply-to-dataset :table)
-
-(defmethod apply-to-dataset :peptides
-  [{:keys [table func did] :as m}]
-  (query ["select * from peptides where dataset=?" did] :peptide func))
-
-(defmethod apply-to-dataset :contigs
-  [{:keys [table func did] :as m}]
-  (query ["select * from contigs where dataset=?" did] :contig func))
-
-(defmethod apply-to-dataset :mrnas
-  [{:keys [table func did] :as m}]
-  (query ["select * from mrnas where dataset=?" did] :contig func))
-
-(defmethod apply-to-dataset :cdss
-  [{:keys [table func did] :as m}]
-  (query ["select * from cdss where dataset=?" did] :contig func))
-
-(defmulti insert-sequences (fn [table c] table))
-
-(defmethod insert-sequences :blasts
-  [table c]
-  (bdb/insert-sequences! dbspec table :jdb-blast c))
-
-(defmethod insert-sequences :interproscan
-  [table c]
-  (bdb/insert-sequences! dbspec table :ips c))
-
-(defmulti count-results :type)
-
-(defmethod count-results :text
-  [{:keys [data] :as m}]
-  (query ["select count(*) from peptides where accession ILIKE ? OR description ILIKE ?"
-          (str "%" data "%") (str "%" data "%")]
-         :default #(-> (first %) :count)))
+(defn- table-type
+  [table]
+  ({:submitters :submitter
+    :datasets :dataset
+    :pmids :pmid
+    :peptides :peptide
+    :mrnas :mrna
+    :cdss :cds
+    :contigs :contig
+    :blasts :jdb-blast
+    :interproscan :ips}
+   table))
 
 (defmulti get-sequences :type)
 
 (defmethod get-sequences :text-proteins
   [{:keys [data offset] :as m}]
-  (query ["select * from peptides where accession ILIKE ? OR description ILIKE ? order by accession OFFSET ? limit 20"
-          (str "%" data "%") (str "%" data "%") offset]
-         :peptide))
+  (let [q ["select * from peptides where accession ILIKE ? OR description ILIKE ? order by accession OFFSET ? limit 20" (str "%" data "%") (str "%" data "%") offset]]
+    (bdb/query-sequences dbspec q :peptide)))
 
 (defmethod get-sequences :jellydb.proteins/cds
   [{:keys [accessions] :as m}]
@@ -225,13 +194,52 @@
 
 (defmethod get-sequences :jellydb.dataset-view/dataset
   [{:keys [dataset] :as m}]
-  (query ["select d.id,d.name,d.type,d.abstract,d.submitter,d.time,d.species,s.first,s.last,s.email,s.address from datasets d, submitters s where d.submitter = s.id and d.id=?" dataset]
-         :jdb-blast))
+  (let [q ["select d.id,d.name,d.type,d.abstract,d.submitter,d.time,d.species,s.first,s.last,s.email,s.address from datasets d, submitters s where d.submitter = s.id and d.id=?" dataset]]
+    (bdb/query-sequences dbspec q :jdb-blast)))
 
 (defmethod get-sequences :jellydb.homology-view/blasts
   [{:keys [accessions] :as m}]
   (bdb/get-sequences dbspec :blasts :jdb-blast accessions
                      :apply-func #(group-by :database %)))
+
+(defmethod get-sequences :selected-export
+  [{:keys [table selected func] :as m}]
+  (bdb/get-sequences dbspec table (table-type table) selected :apply-func func))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; dataset level
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn apply-to-dataset
+  [{:keys [table func did] :as m}]
+  (let [q [(str "select * from " (name table) " where dataset=?") did]]
+    (bdb/query-sequences dbspec q (table-type table) :apply-func func)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; counting results
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmulti count-results :type)
+
+(defmethod count-results :text
+  [{:keys [data] :as m}]
+  (let [q ["select count(*) from peptides where accession ILIKE ? OR description ILIKE ?"
+           (str "%" data "%") (str "%" data "%")]]
+    (bdb/query-sequences dbspec q :default :apply-func #(-> (first %) :count))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; inserting
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmulti insert-sequences (fn [table c] table))
+
+(defmethod insert-sequences :blasts
+  [table c]
+  (bdb/insert-sequences! dbspec table :jdb-blast c))
+
+(defmethod insert-sequences :interproscan
+  [table c]
+  (bdb/insert-sequences! dbspec table :ips c))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ;; construct peptides

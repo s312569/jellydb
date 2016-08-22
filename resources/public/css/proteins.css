@@ -62,7 +62,7 @@ input.pagination {
 .thick {font-weight: bold;}
 /* search box */
 
-#downloadframe {display: none;}
+.downloadframe {display: none;}
 
 /* annotation display */
 

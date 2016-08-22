@@ -19,11 +19,14 @@
 
 (defn- new-key
   [data]
-  (loop [id (ut/new-uuid)]
+  (loop [id (ut/new-uuid)
+         c 0]
+    (if (<= c 10)
       (if-not (get @search-keys id)
         (do (swap! search-keys assoc id data)
             {:status :success :key id})
-        (recur (ut/new-uuid)))))
+        (recur (ut/new-uuid) (inc c)))
+      {:status :failure :message "Could not obtain search key"})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; dataset retrieval
@@ -33,18 +36,36 @@
   [{:keys [table did] :as m}]
   (new-key {:type :dataset-retrieval :table table :did did}))
 
+(defmethod serve/search-key :jellydb.proteins/export
+  [{:keys [table data] :as m}]
+  (let [k (new-key {:type :selected-export :table table :selected data})]
+    (println (@search-keys (:key k)))
+    k))
+
 (defn- jdb-fasta-string
   [s]
   (if (:original-accession s)
     (fasta/fasta-string (assoc s :accession (:original-accession s)))
     (fasta/fasta-string s)))
 
+(defmulti get-key-result :type)
+
+(defmethod get-key-result :dataset-retrieval
+  [{:keys [table did] :as m}]
+  (apply-to-dataset
+   (assoc m :func #(let [f (ut/working-file "dls")]
+                     (fasta/fasta->file % f :func jdb-fasta-string)))))
+
+(defmethod get-key-result :selected-export
+  [{:keys [table selected] :as m}]
+  (get-sequences
+   (assoc m :func #(let [f (ut/working-file "els")]
+                     (fasta/fasta->file % f :func jdb-fasta-string)))))
+
 (defn dataset-sequences
   [key]
-  (let [d (@search-keys key)]
-    (apply-to-dataset
-     (assoc d :func #(let [f (ut/working-file "dls")]
-                       (fasta/fasta->file % f :func jdb-fasta-string))))))
+  (let [m (@search-keys key)]
+    (get-key-result m)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; text search

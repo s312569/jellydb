@@ -16,29 +16,6 @@
 (defonce app-state (atom {:offset 0 :key nil :selected []}))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; ;; export dropdown
-;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; (defn- export
-;;   [_ owner]
-;;   (om/component
-;;    (let [r '({:value "placeholder" :name "Other functions"
-;;               :disabled true}
-;;              {:value "peps" :name "Export selected sequences as protein"}
-;;              {:value "cds" :name "Export selected sequences as CDS"}
-;;              {:value "mrnas" :name "Export selected sequences as mRNA"}
-;;              {:value "only-selected" :name "Only show selected"})]
-;;      (dom/div
-;;       #js {:style #js {:float "right"}}
-;;       (om/build jdbu/select {:label-func :name
-;;                              :value-func :value
-;;                              :selected "placeholder"
-;;                              :classname "myinput small-text"
-;;                              :onchange-func
-;;                              #(jdbu/pub-info owner :export (-> % .-target .-value))
-;;                              :records r})))))
-
-;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ;; select all|none
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -99,14 +76,6 @@
 ;;                                                   "flinki" "flinka")}
 ;;                                 "None"))
 ;;          :spinner (om/build all-none-spinner nil))))))
-
-;; (defn- download-frame
-;;   [ekey _]
-;;   (om/component
-;;    (dom/iframe #js {:id "downloadframe"
-;;                     :src (if-not (= ekey "")
-;;                            (str "/fetch?k=" ekey)
-;;                            "")})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; sequence views
@@ -368,6 +337,37 @@
 ;; navigation
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defn- export
+  [_ owner]
+  (reify
+    om/IInitState
+    (init-state [_]
+      {:ekey nil})
+    om/IRenderState
+    (render-state [_ {:keys [ekey]}]
+        (let [r '({:value "placeholder" :name "Export ..." :disabled true}
+                  {:value "peptides" :name "Export selected sequences as proteins"}
+                  {:value "cdss" :name "Export selected sequences as CDS"}
+                  {:value "mrnas" :name "Export selected sequences as mRNAs"})]
+          (dom/div
+           #js {:style #js {:float "right"}}
+           (dom/iframe #js {:className "downloadframe"
+                            :src (if ekey (str "/fetch?k=" ekey) "")})
+           (om/build ut/select {:label-func :name
+                                :value-func :value
+                                :selected "placeholder"
+                                :classname "myinput small-text"
+                                :onchange-func
+                                #(let [v (keyword (-> % .-target .-value))]
+                                   (serve/search-key {:type ::export
+                                                      :table v
+                                                      :data (@app-state :selected )}
+                                                     (fn [x]
+                                                       (if (= :success (:status x))
+                                                         (om/set-state! owner :ekey (:key x))
+                                                         (ut/error-redirect x)))))
+                                :records r}))))))
+
 (defn navigation
   [{:keys [offset key count] :as app} owner]
   (om/component
@@ -405,8 +405,7 @@
                    :href (if dis? "#" (str "/prots/" key "/" (* (quot count 20) 20)))}
               ">>")))
     (dom/div #js {:className "pure-u-1-2" :style #js {:text-align "right"}}
-             ;;(om/build export nil)
-             "Export"))))
+             (om/build export nil)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; outer 
@@ -448,7 +447,7 @@
     (will-receive-props [_ app]
       (get-proteins app owner))
     om/IRenderState
-    (render-state [_ {:keys [prots]}]
+    (render-state [_ {:keys [prots ekey]}]
       (dom/div
        #js {:className "pure-u-1-1"}
        (om/build navigation app)

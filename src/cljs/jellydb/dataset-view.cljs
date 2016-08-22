@@ -42,7 +42,7 @@
         (dom/div
          nil
          (dom/iframe
-          #js {:id "downloadframe"
+          #js {:className "downloadframe"
                :src (if ekey (str "/fetch?k=" ekey) "")}
           (om/set-state! owner :ekey nil))
          (dom/div #js {:className "tbpadded"} "")
