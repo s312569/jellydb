@@ -244,11 +244,9 @@
         (dom/div
          nil
          (dom/div #js {:className "tbpadded"} "")
-         (dom/div #js {:className "tbpadded"} "")
          (om/build ut/waiting nil))
         (dom/div
          nil
-         (dom/div #js {:className "tbpadded"} "")
          (dom/div #js {:className "tbpadded"} "")
          (om/build annotations {:protein protein :ipss ips})
          (om/build go-terms {:protein protein :ipss ips})

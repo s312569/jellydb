@@ -37,7 +37,6 @@
         (dom/div
          nil
          (dom/div #js {:className "tbpadded"} "")
-         (dom/div #js {:className "tbpadded"} "")
          (om/build ut/waiting nil))
         (dom/div
          nil
@@ -45,7 +44,6 @@
           #js {:className "downloadframe"
                :src (if ekey (str "/fetch?k=" ekey) "")}
           (om/set-state! owner :ekey nil))
-         (dom/div #js {:className "tbpadded"} "")
          (dom/div #js {:className "tbpadded"} "")         
          (dom/div #js {:className "pure-u-5-5 thick hcenter greyed"} "Assembly")
          (dom/div #js {:className "pure-u-1-5 thick"} "Dataset ID:")

@@ -58,10 +58,8 @@
         (dom/div
          nil
          (dom/div #js {:className "tbpadded"} "")
-         (dom/div #js {:className "tbpadded"} "")
          (om/build ut/waiting nil))
         (dom/div
          nil
-         (dom/div #js {:className "tbpadded"} "")
          (dom/div #js {:className "tbpadded"} "")       
          (apply dom/div nil (map db-homologies (vals homologies))))))))

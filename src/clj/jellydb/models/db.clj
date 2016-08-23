@@ -178,6 +178,12 @@
   (let [q ["select * from peptides where accession ILIKE ? OR description ILIKE ? order by accession OFFSET ? limit 20" (str "%" data "%") (str "%" data "%") offset]]
     (bdb/query-sequences dbspec q :peptide)))
 
+(defmethod get-sequences :jellydb.proteins/selected
+  [{:keys [data] :as m}]
+  (let [q ["select accession from peptides where accession ILIKE ? OR description ILIKE ?"
+           (str "%" data "%") (str "%" data "%")]]
+    (bdb/query-sequences dbspec q :peptide :apply-func #(vec (map :accession %)))))
+
 (defmethod get-sequences :jellydb.proteins/cds
   [{:keys [accessions] :as m}]
   (bdb/get-sequences dbspec :cdss :cds accessions))

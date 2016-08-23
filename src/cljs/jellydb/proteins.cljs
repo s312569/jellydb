@@ -15,67 +15,48 @@
 
 (defonce app-state (atom {:offset 0 :key nil :selected []}))
 
-;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; ;; select all|none
-;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; select all|none
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; (defn all-none-spinner
-;;   [_ owner]
-;;   (om/component
-;;    (dom/div
-;;     #js {:className "pure-u-2-24"}
-;;     (dom/div
-;;      #js {:id "escapingBallG"}
-;;      (dom/div #js {:id "escapingBall_1" :className "escapingBallG"})))))
+(defn- select-all
+  [app owner]
+  (serve/get-data {:type ::selected :key (:key @app)}
+                  (fn [x]
+                    (om/transact! app #(assoc % :selected (:data x)))
+                    (om/set-state! owner :waiting false))))
 
-;; (defn all-none-do
-;;   [k owner]
-;;   (if (= k :all)
-;;     (om/set-state! owner :showing :spinner)
-;;     (om/set-state! owner :showing :links))
-;;   (jdbu/pub-info owner :all-none k)
-;;   (om/set-state! owner :selected k))
-
-;; (defn select-all-none
-;;   [{:keys [count all]} owner]
-;;   (reify
-;;     om/IInitState
-;;     (init-state [_]
-;;       {:selected :none
-;;        :showing :links})
-;;     om/IWillMount
-;;     (will-mount [_]
-;;       (jdbu/register-loop owner :all-done-done
-;;                           (fn [o e]
-;;                             (om/set-state! owner :showing :links))))
-;;     om/IWillUnmount
-;;     (will-unmount [_]
-;;       (jdbu/unsubscribe owner :all-done-done))
-;;     om/IWillReceiveProps
-;;     (will-receive-props [_ {:keys [count all]}]
-;;       (cond (= count 0)
-;;             (om/set-state! owner :selected :none)
-;;             (= count all)
-;;             (om/set-state! owner :selected :all)
-;;             (> count 0)
-;;             (om/set-state! owner :selected :both)))
-;;     om/IRenderState
-;;     (render-state [_ {:keys [selected showing]}]
-;;       (dom/div
-;;        #js {:className "tbpadded"}
-;;        "Select: "
-;;        (condp = showing
-;;          :links (dom/div #js {:className "pure-u-4-24"}
-;;                          (dom/a #js {:onClick #(all-none-do :all owner)
-;;                                      :className (if (= selected :all)
-;;                                                   "flinki" "flinka")}
-;;                                 "All")
-;;                          " | "
-;;                          (dom/a #js {:onClick #(all-none-do :none owner)
-;;                                      :className (if (= selected :none)
-;;                                                   "flinki" "flinka")}
-;;                                 "None"))
-;;          :spinner (om/build all-none-spinner nil))))))
+(defn select-all-none
+  [{:keys [selected scount] :as app} owner]
+  (reify
+    om/IInitState
+    (init-state [_]
+      {:waiting false})
+    om/IRenderState
+    (render-state [_ {:keys [waiting]}]
+      (dom/div
+       #js {:className "tbpadded" :style #js {:text-align "left"}}
+       "Select: "
+       (if waiting
+         (dom/div
+          #js {:className "pure-u-5-24"}
+          (dom/span
+           #js {:id "escapingBallG"}
+           (dom/div #js {:id "escapingBall_1" :className "escapingBallG"})))
+         (dom/div
+          #js {:className "pure-u-5-24"}
+          (dom/a #js {:onClick #(if-not (= (:scount @app) (count (:selected @app)))
+                                  (do (om/set-state! owner :waiting true)
+                                      (select-all app owner)))
+                      :className (if (= scount (count selected))
+                                   "flinki" "flinka")}
+                 "All")
+          " | "
+          (dom/a #js {:onClick #(if (seq (:selected @app))
+                                  (om/transact! app (fn [x] (assoc x :selected []))))
+                      :className (if (seq selected)
+                                   "flinka" "flinki")}
+                 "None")))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; sequence views
@@ -274,32 +255,28 @@
       (dom/div nil "")
       (dom/div
        #js {:className "pure-u-1-1"}
-       ;; (dom/div
-       ;;  #js {:className "pure-u-1-24"} "")
        (dom/div
         #js {:className "pure-u-23-24"}
         (dom/div
          #js {:style #js {:position "relative"}}
          (if-not (= visible :none)
            (dom/div
-            #js {:style #js {:position "absolute" :top "15" :right "10" :color "#cad2d3"}}
+            #js {:style #js {:position "absolute" :top "-10" :right "10" :color "#cad2d3"}}
             (dom/a
              #js {:onClick #(om/set-state! owner :visible :none)
                   :style #js {:cursor "pointer"}}
              "Close")))
          (dom/div
           #js {:className "tbpadded" :style #js {:text-align "left"}}
-          (dom/div
-           #js {:className "tbpadded" :style #js {:text-align "left"}}
-           (condp = visible
-             :protein (om/build sequence-view {:protein protein :type ::protein})
-             :cds (om/build sequence-view {:protein protein :type ::cds})
-             :mrna (om/build sequence-view {:protein protein :type ::mrna})
-             :annotation (om/build ann/annotation-view protein)
-             :dataset (om/build data/dataset-view protein)
-             :homology (om/build homology-view protein)
-             :blast "blast"
-             nil)))))))))
+          (condp = visible
+            :protein (om/build sequence-view {:protein protein :type ::protein})
+            :cds (om/build sequence-view {:protein protein :type ::cds})
+            :mrna (om/build sequence-view {:protein protein :type ::mrna})
+            :annotation (om/build ann/annotation-view protein)
+            :dataset (om/build data/dataset-view protein)
+            :homology (om/build homology-view protein)
+            :blast "blast"
+            nil))))))))
 
 (defn- protein [protein owner]
   (reify
@@ -369,7 +346,7 @@
                                 :records r}))))))
 
 (defn navigation
-  [{:keys [offset key count] :as app} owner]
+  [{:keys [offset key scount] :as app} owner]
   (om/component
    (dom/div
     #js {:className "pure-u-1-1 padded"}
@@ -390,19 +367,19 @@
      (dom/button #js {:className "buttondisplay"
                       :disabled "true"}
                  (str (+ offset 1) " to "
-                      (if (> (+ offset 20) count) count (+ offset 20))
-                      " of " count))
-     (let [dis? (if (>= (+ offset 20) count) true false)]
+                      (if (> (+ offset 20) scount) scount (+ offset 20))
+                      " of " scount))
+     (let [dis? (if (>= (+ offset 20) scount) true false)]
        (dom/a #js {:style #js {:font-size "85%"}
                    :className "pure-button"
                    :disabled dis?
                    :href (if dis? "#" (str "/prots/" key "/" (+ offset 20)))}
               ">"))
-     (let [dis? (if (>= (+ 20 offset) count) true false)]
+     (let [dis? (if (>= (+ 20 offset) scount) true false)]
        (dom/a #js {:style #js {:font-size "85%"}
                    :className "pure-button"
                    :disabled dis?
-                   :href (if dis? "#" (str "/prots/" key "/" (* (quot count 20) 20)))}
+                   :href (if dis? "#" (str "/prots/" key "/" (* (quot scount 20) 20)))}
               ">>")))
     (dom/div #js {:className "pure-u-1-2" :style #js {:text-align "right"}}
              (om/build export nil)))))
@@ -451,6 +428,7 @@
       (dom/div
        #js {:className "pure-u-1-1"}
        (om/build navigation app)
+       (om/build select-all-none app)
        (if-not prots
          (dom/div
           #js {:className "pure-u-1-1 padded"}
@@ -497,7 +475,7 @@
   (serve/get-data {:type :search :key key}
                   #(if (= :success (:status %))
                      (reset! app-state {:offset 0 :key key :selected []
-                                        :count (:count (:data %))
+                                        :scount (:count (:data %))
                                         :search (:data (:data %))})
                      (ut/error-redirect %))))
 

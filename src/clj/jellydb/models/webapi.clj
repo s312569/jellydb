@@ -13,6 +13,9 @@
 (defmethod serve/get-data :search
   [{:keys [key] :as m}]
   (let [r (@search-keys key)]
+    (println key)
+    (println (str "******** " r))
+    (println @search-keys)
     (if r
       {:status :success :data r}
       {:status :failure :message "Search key doesn't exist."})))
@@ -38,9 +41,7 @@
 
 (defmethod serve/search-key :jellydb.proteins/export
   [{:keys [table data] :as m}]
-  (let [k (new-key {:type :selected-export :table table :selected data})]
-    (println (@search-keys (:key k)))
-    k))
+  (new-key {:type :selected-export :table table :selected data}))
 
 (defn- jdb-fasta-string
   [s]
@@ -81,6 +82,12 @@
   (if-let [r (get-sequences (assoc m :data (:data (@search-keys key))))]
     {:status :success :data r}
     {:status :failure :message "Something amiss in sequence retrieval."}))
+
+(defmethod serve/get-data :jellydb.proteins/selected
+  [{:keys [key type] :as m}]
+  (if-let [r (get-sequences (assoc m :data (:data (@search-keys key))))]
+    {:status :success :data r}
+    {:status :failure :message "Something amiss in sequence selected retrieval."}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; sequence retrieval
