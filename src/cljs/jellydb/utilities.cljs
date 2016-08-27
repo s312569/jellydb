@@ -103,7 +103,8 @@
 
 (defn select
   [{:keys [records label label-func value-func
-           classname selected onchange-func disabled]}
+           classname selected onchange-func disabled
+           width]}
    owner]
   (om/component
    (dom/div
@@ -114,7 +115,8 @@
      #js {:onChange onchange-func
           :value selected
           :disabled (or disabled false)
-          :className (or classname "")}
+          :className (or classname "")
+          :style #js {:width (or width "")}}
      (map #(cond (:disabled %)
                  (dom/option
                   #js {:value (value-func %)

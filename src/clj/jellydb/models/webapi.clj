@@ -10,16 +10,6 @@
 
 (def search-keys (atom {}))
 
-(defmethod serve/get-data :search
-  [{:keys [key] :as m}]
-  (let [r (@search-keys key)]
-    (println key)
-    (println (str "******** " r))
-    (println @search-keys)
-    (if r
-      {:status :success :data r}
-      {:status :failure :message "Search key doesn't exist."})))
-
 (defn- new-key
   [data]
   (loop [id (ut/new-uuid)
@@ -31,42 +21,18 @@
         (recur (ut/new-uuid) (inc c)))
       {:status :failure :message "Could not obtain search key"})))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; dataset retrieval
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defmethod serve/get-data :search
+  [{:keys [key] :as m}]
+  (let [r (@search-keys key)]
+    (if r
+      {:status :success :data r}
+      {:status :failure :message "Search key doesn't exist."})))
 
-(defmethod serve/search-key :jellydb.dataset-view/dataset
-  [{:keys [table did] :as m}]
-  (new-key {:type :dataset-retrieval :table table :did did}))
-
-(defmethod serve/search-key :jellydb.proteins/export
-  [{:keys [table data] :as m}]
-  (new-key {:type :selected-export :table table :selected data}))
-
-(defn- jdb-fasta-string
-  [s]
-  (if (:original-accession s)
-    (fasta/fasta-string (assoc s :accession (:original-accession s)))
-    (fasta/fasta-string s)))
-
-(defmulti get-key-result :type)
-
-(defmethod get-key-result :dataset-retrieval
-  [{:keys [table did] :as m}]
-  (apply-to-dataset
-   (assoc m :func #(let [f (ut/working-file "dls")]
-                     (fasta/fasta->file % f :func jdb-fasta-string)))))
-
-(defmethod get-key-result :selected-export
-  [{:keys [table selected] :as m}]
-  (get-sequences
-   (assoc m :func #(let [f (ut/working-file "els")]
-                     (fasta/fasta->file % f :func jdb-fasta-string)))))
-
-(defn dataset-sequences
-  [key]
-  (let [m (@search-keys key)]
-    (get-key-result m)))
+(defmethod serve/get-data :by-key
+  [{:keys [key] :as m}]
+  (if-let [r (get-sequences (merge m (@search-keys key)))]
+    {:status :success :data r}
+    {:status :failure :message "Something amiss in search retrieval."}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; text search
@@ -75,17 +41,19 @@
 (defmethod serve/search-key :text
   [{:keys [data] :as m}]
   (let [qc (count-results m)]
-    (new-key {:type :text-search :data data :count qc})))
+    (new-key {:search-type :text-proteins :data data :count qc})))
 
-(defmethod serve/get-data :text-proteins
-  [{:keys [key offset] :as m}]
-  (if-let [r (get-sequences (assoc m :data (:data (@search-keys key))))]
-    {:status :success :data r}
-    {:status :failure :message "Something amiss in sequence retrieval."}))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; selected functions
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmethod serve/get-data :jellydb.proteins/selected
-  [{:keys [key type] :as m}]
-  (if-let [r (get-sequences (assoc m :data (:data (@search-keys key))))]
+(defmethod serve/search-key :jellydb.proteins/show-selected
+  [{:keys [data]}]
+  (new-key {:search-type :only-selected :data data :count (count data)}))
+
+(defmethod serve/get-data :jellydb.proteins/select-all
+  [{:keys [key] :as m}]
+  (if-let [r (get-sequences (merge m (@search-keys key)))]
     {:status :success :data r}
     {:status :failure :message "Something amiss in sequence selected retrieval."}))
 
@@ -126,3 +94,40 @@
   (if-let [r (get-sequences (assoc m :accessions [accession]))]
     {:status :success :data r}
     {:status :failure :message "Something wrong with blast retrieval by accession."}))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; file retrieval 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmethod serve/search-key :jellydb.dataset-view/dataset
+  [{:keys [table did] :as m}]
+  (new-key {:search-type :dataset-retrieval :table table :did did}))
+
+(defmethod serve/search-key :jellydb.proteins/export
+  [{:keys [table data] :as m}]
+  (new-key {:search-type :selected-export :table table :selected data}))
+
+(defn- jdb-fasta-string
+  [s]
+  (if (:original-accession s)
+    (fasta/fasta-string (assoc s :accession (:original-accession s)))
+    (fasta/fasta-string s)))
+
+(defmulti get-key-result :search-type)
+
+(defmethod get-key-result :dataset-retrieval
+  [m]
+  (get-sequences
+   (assoc m :func #(let [f (ut/working-file "dls")]
+                     (fasta/fasta->file % f :func jdb-fasta-string)))))
+
+(defmethod get-key-result :selected-export
+  [m]
+  (get-sequences
+   (assoc m :func #(let [f (ut/working-file "els")]
+                     (fasta/fasta->file % f :func jdb-fasta-string)))))
+
+(defn dataset-sequences
+  [key]
+  (let [m (@search-keys key)]
+    (get-key-result (assoc m :type :file-retrieval))))

@@ -155,7 +155,7 @@
   (assoc (dissoc q :type) :hit (edn/read-string (:hit q))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; getting sequences
+;; dataset level
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- table-type
@@ -171,18 +171,39 @@
     :interproscan :ips}
    table))
 
-(defmulti get-sequences :type)
+(defn apply-to-dataset
+  [{:keys [table func did] :as m}]
+  (let [q [(str "select * from " (name table) " where dataset=?") did]]
+    (bdb/query-sequences dbspec q (table-type table) :apply-func func)))
 
-(defmethod get-sequences :text-proteins
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; getting sequences
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmulti get-sequences (fn [m]
+                          (if (:search-type m)
+                            (vector (:type m) (:search-type m))
+                            (:type m))))
+
+(defmethod get-sequences [:by-key :text-proteins]
   [{:keys [data offset] :as m}]
   (let [q ["select * from peptides where accession ILIKE ? OR description ILIKE ? order by accession OFFSET ? limit 20" (str "%" data "%") (str "%" data "%") offset]]
     (bdb/query-sequences dbspec q :peptide)))
 
-(defmethod get-sequences :jellydb.proteins/selected
+(defmethod get-sequences [:by-key :only-selected]
+  [{:keys [data offset] :as m}]
+  (let [ids (take 20 (drop offset data))]
+    (bdb/get-sequences dbspec :peptides :peptide ids)))
+
+(defmethod get-sequences [:jellydb.proteins/select-all :text-proteins]
   [{:keys [data] :as m}]
   (let [q ["select accession from peptides where accession ILIKE ? OR description ILIKE ?"
            (str "%" data "%") (str "%" data "%")]]
     (bdb/query-sequences dbspec q :peptide :apply-func #(vec (map :accession %)))))
+
+(defmethod get-sequences [:jellydb.proteins/select-all :only-selected]
+  [{:keys [data] :as m}]
+  (:data m))
 
 (defmethod get-sequences :jellydb.proteins/cds
   [{:keys [accessions] :as m}]
@@ -208,18 +229,17 @@
   (bdb/get-sequences dbspec :blasts :jdb-blast accessions
                      :apply-func #(group-by :database %)))
 
-(defmethod get-sequences :selected-export
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; file retrieval
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmethod get-sequences [:file-retrieval :selected-export]
   [{:keys [table selected func] :as m}]
   (bdb/get-sequences dbspec table (table-type table) selected :apply-func func))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; dataset level
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defn apply-to-dataset
-  [{:keys [table func did] :as m}]
-  (let [q [(str "select * from " (name table) " where dataset=?") did]]
-    (bdb/query-sequences dbspec q (table-type table) :apply-func func)))
+(defmethod get-sequences [:file-retrieval :dataset-retrieval]
+  [{:keys [table did func] :as m}]
+  (apply-to-dataset {:table table :did did :func func}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; counting results

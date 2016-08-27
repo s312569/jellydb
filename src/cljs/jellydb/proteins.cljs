@@ -21,7 +21,7 @@
 
 (defn- select-all
   [app owner]
-  (serve/get-data {:type ::selected :key (:key @app)}
+  (serve/get-data {:type ::select-all :key (:key @app)}
                   (fn [x]
                     (om/transact! app #(assoc % :selected (:data x)))
                     (om/set-state! owner :waiting false))))
@@ -314,36 +314,70 @@
 ;; navigation
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defmulti more-action (fn [v owner] v))
+
+(defmethod more-action :default
+  [v owner]
+  (serve/search-key {:type ::export :table v :data (@app-state :selected)}
+                    (fn [x]
+                      (if (= :success (:status x))
+                        (om/set-state! owner :ekey (:key x))
+                        (ut/error-redirect x)))))
+
+(defmethod more-action :only
+  [v owner]
+  (serve/search-key {:type ::show-selected :data (@app-state :selected)}
+                    (fn [x]
+                      (if (= :success (:status x))
+                        (om/set-state! owner :redirect (str "/prots/" (:key x) "/" 0))))))
+
 (defn- export
-  [_ owner]
+  [app owner]
   (reify
     om/IInitState
     (init-state [_]
-      {:ekey nil})
+      {:ekey nil
+       :redirect false})
     om/IRenderState
-    (render-state [_ {:keys [ekey]}]
-        (let [r '({:value "placeholder" :name "Export ..." :disabled true}
-                  {:value "peptides" :name "Export selected sequences as proteins"}
-                  {:value "cdss" :name "Export selected sequences as CDS"}
-                  {:value "mrnas" :name "Export selected sequences as mRNAs"})]
-          (dom/div
-           #js {:style #js {:float "right"}}
-           (dom/iframe #js {:className "downloadframe"
-                            :src (if ekey (str "/fetch?k=" ekey) "")})
-           (om/build ut/select {:label-func :name
-                                :value-func :value
-                                :selected "placeholder"
-                                :classname "myinput small-text"
-                                :onchange-func
-                                #(let [v (keyword (-> % .-target .-value))]
-                                   (serve/search-key {:type ::export
-                                                      :table v
-                                                      :data (@app-state :selected )}
-                                                     (fn [x]
-                                                       (if (= :success (:status x))
-                                                         (om/set-state! owner :ekey (:key x))
-                                                         (ut/error-redirect x)))))
-                                :records r}))))))
+    (render-state [_ {:keys [ekey redirect]}]
+      (if redirect
+        (do (acc/navigate! redirect)
+            (om/set-state! owner :redirect false)
+            (dom/div nil ""))
+        (if-not (seq (:selected app))
+          (apply
+           dom/select
+           #js {:style #js {:width "260px"}
+                :className "myinput small-text"
+                :value "placeholder"}
+           [(dom/option #js {:value "placeholder" :disabled true :selected true}
+                        "More ...")
+            (dom/optgroup
+             #js {:label "Select some sequences to access"}
+             nil)
+            (dom/optgroup
+             #js {:label "more actions"}
+             nil)])
+          (let [r '({:value "placeholder" :name "More ..." :disabled true}
+                    {:value "peptides" :name "Export selected sequences as proteins"}
+                    {:value "cdss" :name "Export selected sequences as CDS"}
+                    {:value "mrnas" :name "Export selected sequences as mRNAs"}
+                    {:value "only" :name "Only show selected."})]
+            (dom/div
+             #js {:style #js {:float "right"}}
+             (dom/iframe #js {:className "downloadframe"
+                              :src (if ekey (str "/fetch?k=" ekey) "")}
+                         "")
+             (om/set-state! owner :ekey nil)
+             (om/build ut/select {:label-func :name
+                                  :value-func :value
+                                  :selected "placeholder"
+                                  :classname "myinput small-text"
+                                  :width "260px"
+                                  :onchange-func
+                                  #(let [v (keyword (-> % .-target .-value))]
+                                     (more-action v owner))
+                                  :records r}))))))))
 
 (defn navigation
   [{:keys [offset key scount] :as app} owner]
@@ -382,7 +416,7 @@
                    :href (if dis? "#" (str "/prots/" key "/" (* (quot scount 20) 20)))}
               ">>")))
     (dom/div #js {:className "pure-u-1-2" :style #js {:text-align "right"}}
-             (om/build export nil)))))
+             (om/build export app)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; outer 
@@ -390,39 +424,39 @@
 
 (defn get-proteins
   [{:keys [key offset]} owner]
-  (serve/get-data {:type :text-proteins :key key :offset offset}
-                  #(if (= :success (:status %))
-                     (om/set-state! owner :prots (:data %))
-                     (ut/error-redirect %))))
+  (if key
+    (serve/get-data {:type :by-key :key key :offset offset}
+                    #(if (= :success (:status %))
+                       (do (om/set-state! owner :prots (:data %))
+                           (om/set-state! owner :offset offset)
+                           (om/set-state! owner :key key))
+                       (ut/error-redirect %)))))
 
 (defn search-report
   [{:keys [search] :as search-data}]
-  (dom/div
-   #js {:className "pure-u-1-1"}
-   (if search
-     (dom/p nil (str "Showing results for search '" search "'"))
-     (dom/p nil ""))))
-
-(defn search-box
-  []
-  (dom/div
-   #js {:className "pure-u-1-1"}
-   (dom/div
-    #js {:className "hdisplay hcenter"}
-    (om/build ts/search "New search ..."))))
+  (if (string? search)
+    (dom/div
+     #js {:className "pure-u-1-1"}
+     (if search
+       (dom/p nil (str "Showing results for search '" search "'"))
+       (dom/p nil "")))
+    (dom/div nil "")))
 
 (defn proteins
   [{:keys [offset key] :as app} owner]
   (reify
     om/IInitState
     (init-state [_]
-      {:prots nil})
+      {:key key
+       :offset offset})
     om/IWillMount
     (will-mount [_]
       (get-proteins app owner))
     om/IWillReceiveProps
     (will-receive-props [_ app]
-      (get-proteins app owner))
+      (cond (or (not (= (:key app) (om/get-state owner :key)))
+                (not (= (:offset app) (om/get-state owner :offset))))
+            (get-proteins app owner)))
     om/IRenderState
     (render-state [_ {:keys [prots ekey]}]
       (dom/div
@@ -448,7 +482,11 @@
      #js {:style #js {:clear "both"}}
      (dom/div
       #js {:className "pure-g padded"}
-      (search-box)
+      (dom/div
+       #js {:className "pure-u-1-1"}
+       (dom/div
+        #js {:className "hdisplay hcenter"}
+        (om/build ts/search "New search ...")))
       (search-report app)
       (om/build proteins app))))))
 
@@ -461,10 +499,12 @@
                             :path-exists? (fn [path]
                                             (sec/locate-route path))})
 
+(declare get-search)
+
 (defroute "/prots/:key/:offset" [key offset]
-  (js/console.log (str "User: " key))
-  (js/console.log offset)
-  (swap! app-state #(assoc % :offset (js/parseInt offset))))
+  (if (= key (@app-state :key))
+    (swap! app-state #(assoc % :offset (js/parseInt offset)))
+    (get-search key)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; init
@@ -472,6 +512,7 @@
 
 (defn get-search
   [key]
+  (reset! app-state {:offset 0 :key nil :selected []})
   (serve/get-data {:type :search :key key}
                   #(if (= :success (:status %))
                      (reset! app-state {:offset 0 :key key :selected []
