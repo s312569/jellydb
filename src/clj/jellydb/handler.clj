@@ -8,6 +8,7 @@
             [ring.middleware.defaults :refer [wrap-defaults site-defaults]]
             [jellydb.routes.home :refer [home-routes]]
             [jellydb.routes.proteins :refer [proteins-routes]]
+            [jellydb.routes.blast :refer [blast-routes]]
             [jellydb.server :as wss]))
 
 (defroutes app-routes
@@ -44,7 +45,7 @@
   (route/not-found "Not Found"))
 
 (def app
-  (-> (routes home-routes proteins-routes app-routes)
+  (-> (routes home-routes proteins-routes blast-routes app-routes)
       (middleware/wrap-json-body {:keywords? true})
       (middleware/wrap-json-response)
       (wrap-defaults (assoc site-defaults :security {:anti-forgery false}))))

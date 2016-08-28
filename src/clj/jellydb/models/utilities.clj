@@ -4,6 +4,7 @@
             [clojure.string :as st]
             [clojure.java.jdbc :as db]
             [clojure.java.io :as io]
+            [clj-fasta.core :as fasta]
             [me.raynes.fs :as fs])
   (:import [org.apache.commons.codec.binary Base64]))
 
@@ -44,6 +45,16 @@
 (defn de-asterisk
   [fs]
   (update-in fs [:sequence] #(st/replace % #"\*" "")))
+
+(defn- jdb-fasta-string
+  [s]
+  (if (:original-accession s)
+    (fasta/fasta-string (assoc s :accession (:original-accession s)))
+    (fasta/fasta-string s)))
+
+(defn sequences->file
+  [file coll]
+  (fasta/fasta->file coll file :func jdb-fasta-string :append false))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; db utilities

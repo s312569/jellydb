@@ -38,7 +38,7 @@
         (om/build search "Search for sequences ...")))
       (dom/div
        #js {:className "pure-u-11-24"
-            :onClick #(jdbu/pub-info owner :view nil "blast")}
+            :onClick #(set! js/window.location "/blast")}
        (dom/div
         #js {:className "hdisplay hcenter my-cursor"}
         (dom/h1 nil "Blast")

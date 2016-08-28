@@ -1,6 +1,6 @@
 (ns jellydb.models.blast
   (:require [clj-blast.core :as bl]
-            [jellydb.models.utilities :refer [working-file]]
+            [jellydb.models.utilities :refer [working-file sequences->file]]
             [jellydb.models.db :refer :all]
             [clojure.string :refer [split]]
             [clojure.java.io :refer [reader]]
@@ -41,6 +41,38 @@
                     files))
         (finally
           (dorun (map delete files)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; blast searches
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(def blast-dbs {:jdb-prot {:file "/home/jason/Dropbox/jellydb/resources/blast/jdb-prot"
+                           :table :peptides
+                           :type "prot"}
+                :jdb-cds {:file "/home/jason/Dropbox/jellydb/resources/blast/jdb-cds"
+                          :table :cdss
+                          :type "nucl"}
+                :jdb-mrna {:file "/home/jason/Dropbox/jellydb/resources/blast/jdb-mrna"
+                           :table :mrnas
+                           :type "nucl"}})
+
+(defn make-jdb-blast-dbs
+  []
+  (map (fn [{:keys [file table type]}]
+         (get-sequences {:table table :func #(bl/create-blastdb % file type) :type ::db-gen}))
+       blast-dbs))
+
+(defn run-blast
+  [{:keys [database text program evalue gapped return]}]
+  (let [s [{:description "User submitted sequence" :sequence text :accession "1"}]
+        f (working-file "blast")
+        p {"-evalue" evalue "-max_target_seqs" return}]
+    (future
+      (bl/blast s program (:file (blast-dbs database)) f
+                :params (if (= program "blastn")
+                          (merge {"-ungapped" (condp = gapped "Yes" false "No" true)}
+                                 p)
+                          p)))))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ;; databases

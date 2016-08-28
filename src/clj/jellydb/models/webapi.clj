@@ -2,6 +2,7 @@
   (:require [jellydb.models.db :refer :all]
             [jellydb.server :as serve]
             [jellydb.models.utilities :as ut]
+            [jellydb.models.blast :as bl]
             [clj-fasta.core :as fasta]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -33,6 +34,26 @@
   (if-let [r (get-sequences (merge m (@search-keys key)))]
     {:status :success :data r}
     {:status :failure :message "Something amiss in search retrieval."}))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; blast search
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmethod serve/search-key :jellydb.blast/blast
+  [{:keys [data] :as m}]
+  (let [f (bl/run-blast data)]
+    (new-key {:search-type :blast-search :data m :future f})))
+
+(defmethod serve/get-data :jellydb.blast/blast-done?
+  [{:keys [key] :as m}]
+  (Thread/sleep 10000)
+  (if-let [s (@search-keys key)]
+    (if (future-done? (:future s))
+      (do (assoc @search-keys key (-> (assoc s :result @(:future s))
+                                      (dissoc :future)))
+          {:status :success :result true})
+      {:status :success :result false})
+    {:status :failure :message "Blast key doesn't exist."}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; text search
@@ -107,25 +128,17 @@
   [{:keys [table data] :as m}]
   (new-key {:search-type :selected-export :table table :selected data}))
 
-(defn- jdb-fasta-string
-  [s]
-  (if (:original-accession s)
-    (fasta/fasta-string (assoc s :accession (:original-accession s)))
-    (fasta/fasta-string s)))
-
 (defmulti get-key-result :search-type)
 
 (defmethod get-key-result :dataset-retrieval
   [m]
   (get-sequences
-   (assoc m :func #(let [f (ut/working-file "dls")]
-                     (fasta/fasta->file % f :func jdb-fasta-string)))))
+   (assoc m :func (partial ut/sequences->file (ut/working-file "dls")))))
 
 (defmethod get-key-result :selected-export
   [m]
   (get-sequences
-   (assoc m :func #(let [f (ut/working-file "els")]
-                     (fasta/fasta->file % f :func jdb-fasta-string)))))
+   (assoc m :func (partial ut/sequences->file (ut/working-file "els")))))
 
 (defn dataset-sequences
   [key]

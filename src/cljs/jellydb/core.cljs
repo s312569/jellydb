@@ -14,6 +14,7 @@
             [jellydb.contact :refer [contact-view]]
             [jellydb.server :as serve]
             [jellydb.home :as home]
+            [jellydb.blast :as blast]
             [cljs-http.client :as http]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

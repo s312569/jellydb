@@ -230,7 +230,7 @@
                      :apply-func #(group-by :database %)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; file retrieval
+;; file retrieval and generation
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmethod get-sequences [:file-retrieval :selected-export]
@@ -240,6 +240,11 @@
 (defmethod get-sequences [:file-retrieval :dataset-retrieval]
   [{:keys [table did func] :as m}]
   (apply-to-dataset {:table table :did did :func func}))
+
+(defmethod get-sequences :jellydb.models.blast/db-gen
+  [{:keys [table func]}]
+  (let [q [(str "select * from " (name table))]]
+    (bdb/query-sequences dbspec q (table-type table) :apply-func func)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; counting results
@@ -266,6 +271,12 @@
 (defmethod insert-sequences :interproscan
   [table c]
   (bdb/insert-sequences! dbspec table :ips c))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; blasting
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ;; construct peptides
