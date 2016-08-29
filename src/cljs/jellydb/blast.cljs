@@ -207,7 +207,8 @@
   [{:keys [text] :as state} owner]
   (if (= (trim text) "")
     (js/alert "No sequence entered!")
-    (serve/search-key {:type ::blast :data (dissoc state :change)}
+    (serve/search-key {:type ::blast :data (-> (dissoc state :change)
+                                               (dissoc state :key))}
                       #(if (= :success (:status %))
                          (om/set-state! owner :key (:key %))
                          (ut/error-redirect %)))))

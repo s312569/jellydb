@@ -459,6 +459,7 @@
             (get-proteins app owner)))
     om/IRenderState
     (render-state [_ {:keys [prots ekey]}]
+      (ut/log @app-state)
       (dom/div
        #js {:className "pure-u-1-1"}
        (om/build navigation app)

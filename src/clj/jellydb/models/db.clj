@@ -4,6 +4,7 @@
             [clj-fasta.core :refer [fasta-seq]]
             [clojure.java.jdbc :as db]
             [clj-interproscan.core :as ips]
+            [jellydb.models.userblast :as bl]
             [clojure.edn :as edn]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -195,6 +196,12 @@
   (let [ids (take 20 (drop offset data))]
     (bdb/get-sequences dbspec :peptides :peptide ids)))
 
+(defmethod get-sequences [:by-key :blast-search]
+  [{:keys [offset] :as m}]
+  (let [blasts (bl/get-blast-hits (:dbspec m) offset)]
+    (bdb/get-sequences dbspec :peptides :peptide (map :Hit_id blasts)
+                       :apply-func #(map merge blasts %))))
+
 (defmethod get-sequences [:jellydb.proteins/select-all :text-proteins]
   [{:keys [data] :as m}]
   (let [q ["select accession from peptides where accession ILIKE ? OR description ILIKE ?"
@@ -271,12 +278,6 @@
 (defmethod insert-sequences :interproscan
   [table c]
   (bdb/insert-sequences! dbspec table :ips c))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; blasting
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ;; construct peptides

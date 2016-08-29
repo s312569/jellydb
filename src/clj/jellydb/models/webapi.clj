@@ -2,7 +2,7 @@
   (:require [jellydb.models.db :refer :all]
             [jellydb.server :as serve]
             [jellydb.models.utilities :as ut]
-            [jellydb.models.blast :as bl]
+            [jellydb.models.userblast :as bl]
             [clj-fasta.core :as fasta]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -46,12 +46,13 @@
 
 (defmethod serve/get-data :jellydb.blast/blast-done?
   [{:keys [key] :as m}]
-  (Thread/sleep 10000)
   (if-let [s (@search-keys key)]
     (if (future-done? (:future s))
-      (do (assoc @search-keys key (-> (assoc s :result @(:future s))
-                                      (dissoc :future)))
-          {:status :success :result true})
+      (let [br @(:future s)]
+        (swap! search-keys #(-> (update-in % [key] (fn [x] (merge x br)))
+                                (update-in [key] (fn [x] (dissoc x :future)))
+                                (update-in [key :data] (fn [x] (dissoc x :text)))))
+        {:status :success :result true})
       {:status :success :result false})
     {:status :failure :message "Blast key doesn't exist."}))
 
