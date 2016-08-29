@@ -42,7 +42,7 @@
 (defmethod serve/search-key :jellydb.blast/blast
   [{:keys [data] :as m}]
   (let [f (bl/run-blast data)]
-    (new-key {:search-type :blast-search :data m :future f})))
+    (new-key {:search-type :blast-search :data (:data m) :future f})))
 
 (defmethod serve/get-data :jellydb.blast/blast-done?
   [{:keys [key] :as m}]

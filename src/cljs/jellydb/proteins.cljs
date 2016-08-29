@@ -10,6 +10,7 @@
             [jellydb.utilities :as ut]
             [jellydb.dataset-view :as data]
             [jellydb.homology-view :refer [homology-view]]
+            [jellydb.blast-view :refer [blast-output-view]]
             [secretary.core :as sec :refer-macros [defroute]]
             [accountant.core :as acc]))
 
@@ -275,20 +276,24 @@
             :annotation (om/build ann/annotation-view protein)
             :dataset (om/build data/dataset-view protein)
             :homology (om/build homology-view protein)
-            :blast "blast"
+            :blast (om/build blast-output-view protein)
             nil))))))))
 
 (defn- protein [protein owner]
   (reify
     om/IInitState
     (init-state [_]
-      {:visible :none
-       :views [["Protein" :protein]
-               ["CDS" :cds]
-               ["mRNA" :mrna]
-               ["Annotations" :annotation]
-               ["Homologies" :homology]
-               ["Datasets" :dataset]]
+      {:visible (if (:Hit_id protein) :blast :none)
+       :views (let [v  [["Protein" :protein]
+                        ["CDS" :cds]
+                        ["mRNA" :mrna]
+                        ["Annotations" :annotation]
+                        ["Homologies" :homology]
+                        ["Datasets" :dataset]]]
+                (if (:Hit_id protein)
+                  (-> (cons ["Blast" :blast] v)
+                      vec)
+                  v))
        :annotations? false})
     om/IWillMount
     (will-mount [_]
@@ -300,6 +305,7 @@
       (om/set-state! owner :visible :none))
     om/IRenderState
     (render-state [_ {:keys [visible views]}]
+      (ut/log protein)
       (dom/div
        #js {:className "pdisplay"}
        (dom/div

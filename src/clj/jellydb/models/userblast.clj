@@ -43,6 +43,10 @@
   [q]
   (edn/read-string (:hit q)))
 
+(defmethod bdb/restore-sequence :ub-accession
+  [q]
+  (:accession q))
+
 (defn run-blast
   [{:keys [database text program evalue gapped return]}]
   (future
@@ -64,13 +68,19 @@
                     blasts))
         {:file (str (:subname db))
          :count (bdb/query-sequences db ["select accession from sequences"] :user-blast
-                                     :apply-func #(count %))
-         :dbspec db}
+                                     :apply-func #(count %))}
         (finally (dorun (map delete blasts)))))))
 
 
 (defn get-blast-hits
-  [dbspec offset]
-  (let [q ["select * from sequences order by accession OFFSET ? limit 20" offset]]
-    (bdb/query-sequences dbspec q :user-blast)))
+  [file offset]
+  (let [q ["select * from sequences order by accession limit 20 OFFSET ?" offset]
+        db (bdb/db-spec {:dbname file :dbtype :sqlite})]
+    (bdb/query-sequences db q :user-blast)))
+
+(defn select-all-blasts
+  [file]
+  (let [q ["select accession from sequences"]
+        db (bdb/db-spec {:dbname file :dbtype :sqlite})]
+    (bdb/query-sequences db q :ub-accession)))
 

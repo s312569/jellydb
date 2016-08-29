@@ -269,14 +269,3 @@
   (om/root blast nil
            {:target (. js/document (getElementById "t"))}))
 
-
-;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; ;; blast waiting
-;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; (defn check-blast
-;;   [owner]
-;;   (letfn [(h [{:keys [status state]}]
-;;             (if (= "success" status)
-;;               (om/set-state! owner :done state)))]
-;;     (ut/post-params "/blast-check" {:key (om/get-state owner :key)} h)))

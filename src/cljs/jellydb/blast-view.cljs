@@ -31,21 +31,20 @@
     nil
     (dom/div
      #js {:className "pure-u-5-5 thick hcenter greyed"}
-     (str "HSP " (:number hsp)))
+     (str "HSP " (:Hsp_num hsp)))
     (dom/div
      #js {:className "pure-u-5-5 tbpadded"}
-     (str "Identity: " (:identity hsp) "; "
-          "Positive: " (:positive hsp) "; "
-          "Bits: " (:bits hsp) "; "
-          "E-value: " (:evalue hsp)))
+     (str "Identity: " (:Hsp_identity hsp) "; "
+          "Positive: " (:Hsp_positive hsp) "; "
+          "Bits: " (:Hsp_bit-score hsp) "; "
+          "E-value: " (:Hsp_evalue hsp)))
     (dom/div
      #js {:className "pure-u-5-5 tbpadded"}
-     (om/build alignment (-> (:alignment hsp) fix-alignment))))))
+     (om/build alignment (:alignment hsp))))))
 
 (defn blast-output-view [peptide owner]
   (om/component
    (dom/div
-    #js {:className "annopadded"}
-    (apply dom/div
-           #js {:className "tbpadded"}
-           (om/build-all hsp (:hsps (:blast peptide)))))))
+    nil
+    (dom/div #js {:className "tbpadded"} "")
+    (apply dom/div #js {:className "tbpadded"} (om/build-all hsp (:hsps peptide))))))

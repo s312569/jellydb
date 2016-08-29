@@ -103,7 +103,7 @@
 (defmethod -event-msg-handler :jellydb.server/save
   [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
   (let [resp (save-data
-              (assoc (:data ?data) :username (user-id ring-req) :type (:type ?data)))]
+              (assoc (:data ?data) :type (:type ?data)))]
     (when ?reply-fn
       (?reply-fn resp))))
 
@@ -111,7 +111,7 @@
 
 (defmethod -event-msg-handler :jellydb.server/search
   [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
-  (let [resp (search-key (assoc ?data :username (user-id ring-req)))]
+  (let [resp (search-key ?data)]
     (when ?reply-fn
       (?reply-fn resp))))
 
@@ -119,7 +119,7 @@
 
 (defmethod -event-msg-handler :jellydb.server/get
   [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
-  (let [resp (get-data (assoc ?data :username (user-id ring-req)))]
+  (let [resp (get-data ?data)]
     (when ?reply-fn
       (?reply-fn resp))))
 

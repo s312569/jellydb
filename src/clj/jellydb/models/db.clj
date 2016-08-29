@@ -197,16 +197,22 @@
     (bdb/get-sequences dbspec :peptides :peptide ids)))
 
 (defmethod get-sequences [:by-key :blast-search]
-  [{:keys [offset] :as m}]
-  (let [blasts (bl/get-blast-hits (:dbspec m) offset)]
-    (bdb/get-sequences dbspec :peptides :peptide (map :Hit_id blasts)
-                       :apply-func #(map merge blasts %))))
+  [{:keys [offset file] :as m}]
+  (let [blasts (bl/get-blast-hits file offset)]
+    (bdb/get-sequences dbspec :peptides :peptide (doall (map :Hit_id blasts))
+                       :apply-func #(doall (map merge blasts %)))))
 
 (defmethod get-sequences [:jellydb.proteins/select-all :text-proteins]
   [{:keys [data] :as m}]
   (let [q ["select accession from peptides where accession ILIKE ? OR description ILIKE ?"
            (str "%" data "%") (str "%" data "%")]]
     (bdb/query-sequences dbspec q :peptide :apply-func #(vec (map :accession %)))))
+
+(defmethod get-sequences [:jellydb.proteins/select-all :blast-search]
+  [{:keys [file] :as m}]
+  (let [r (bl/select-all-blasts file)]
+    (println r)
+    r))
 
 (defmethod get-sequences [:jellydb.proteins/select-all :only-selected]
   [{:keys [data] :as m}]
