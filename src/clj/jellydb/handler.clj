@@ -3,7 +3,6 @@
             [compojure.core :refer [GET POST defroutes routes]]
             [ring.util.response :refer [resource-response response content-type
                                         header]]
-            [ring.middleware.json :as middleware]
             [jellydb.models.webapi :as wa]
             [ring.middleware.defaults :refer [wrap-defaults site-defaults]]
             [jellydb.routes.home :refer [home-routes]]
@@ -46,6 +45,4 @@
 
 (def app
   (-> (routes home-routes proteins-routes blast-routes app-routes)
-      (middleware/wrap-json-body {:keywords? true})
-      (middleware/wrap-json-response)
       (wrap-defaults (assoc site-defaults :security {:anti-forgery false}))))

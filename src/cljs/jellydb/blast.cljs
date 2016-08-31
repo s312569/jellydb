@@ -3,10 +3,11 @@
   (:require [cljs.core.async :refer [<! >! timeout close! chan put!]]
             [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
-            [clojure.string :refer [trim]]
+            [clojure.string :refer [trim split-lines]]
             [jellydb.proteins :as psv]
             [jellydb.utilities :as ut]
-            [jellydb.server :as serve]))
+            [jellydb.server :as serve]
+            [clj-fasta.core :as fa]))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ;; blast query
@@ -203,8 +204,20 @@
          (dom/div nil "Running search")
          (dom/div #js {:className "loader"} ""))))))
 
+;; (defn- check-blast-input
+;;   [text program]
+;;   (let [allowed (if (#{"blastx" "blastp"} program)
+;;                   (re-pattern "[^ A B C D E F G H I K L M N P Q R S T V W X Y Z *]")
+;;                   (re-pattern "[^ A C G T R Y S W K M B D H V N . -]"))]
+;;     (if-let [v (if (= \> (first value))
+;;                  (-> (split-lines value) second)
+;;                  value)]
+;;       (cond (= (trim v) "")
+;;             "No sequence entered."
+;;             ()))))
+
 (defn blast-submit
-  [{:keys [text] :as state} owner]
+  [{:keys [text program] :as state} owner]
   (if (= (trim text) "")
     (js/alert "No sequence entered!")
     (serve/search-key {:type ::blast :data (-> (dissoc state :change)

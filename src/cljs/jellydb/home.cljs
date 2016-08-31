@@ -3,7 +3,6 @@
             [om.dom :as dom :include-macros true]
             [jellydb.utilities :as jdbu]
             [jellydb.search :refer [search]]
-            [jellydb.links :refer [nav-links]]
             [jellydb.server :as serve]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -26,8 +25,7 @@
       jellyfish transcriptomic sequences and proteomics data. Welcome
       to JellyDB containing jellyfish transcriptomic sequences and
       proteomics data.")
-      (dom/a #js {:onClick #(jdbu/pub-info owner :view nil "contact")
-                  :className "flinka"}
+      (dom/a #js {:className "flinka"}
              "Contact us."))
      (dom/div
       #js {:className "pure-g"}
@@ -50,8 +48,7 @@
                JellyDB.")))
       (dom/div #js {:className "pure-u-2-24"} "")
       (dom/div
-       #js {:className "pure-u-11-24"
-            :onClick #(jdbu/pub-info owner :view nil "datasets")}
+       #js {:className "pure-u-11-24"}
        (dom/div
         #js {:className "hdisplay hcenter my-cursor"}
         (dom/h1 nil "Download Datasets")
