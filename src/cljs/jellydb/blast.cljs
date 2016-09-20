@@ -3,7 +3,7 @@
   (:require [cljs.core.async :refer [<! >! timeout close! chan put!]]
             [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
-            [clojure.string :refer [trim split-lines]]
+            [clojure.string :refer [trim split-lines trim-newline]]
             [jellydb.proteins :as psv]
             [jellydb.utilities :as ut]
             [jellydb.server :as serve]
@@ -85,7 +85,7 @@
     om/IInitState
     (init-state [_]
       {:dna-program #{"blastn"}
-       :dna-db #{"jdb-cds" "jdb-mrna"}
+       :dna-db #{:jdb-cds :jdb-mrna}
        :selected :jdb-prot
        :dna-options [{:value "jdb-cds" :name "CDS"} {:value "jdb-mrna" :name "mRNA"}]
        :prot-options [{:value "jdb-prot" :name "Predicted proteins"}]})
@@ -95,12 +95,12 @@
             dna-program (om/get-state owner :dna-program)]
         (cond (and (dna-program program)
                    (not (dna-db (om/get-state owner :selected))))
-              (do (om/set-state! owner :selected "jdb-cds")
-                  (put! change [:database "jdb-cds"]))
+              (do (om/set-state! owner :selected :jdb-cds)
+                  (put! change [:database :jdb-cds]))
               (and (not (dna-program program))
                    (dna-db (om/get-state owner :selected)))
-              (do (om/set-state! owner :selected "jdb-prot")
-                  (put! change [:database "jdb-prot"])))))
+              (do (om/set-state! owner :selected :jdb-prot)
+                  (put! change [:database :jdb-prot])))))
     om/IRenderState
     (render-state [_ {:keys [selected prot-options dna-options dna-program dna-db]}]
       (dom/div
@@ -110,7 +110,7 @@
                   :label-func :name
                   :value-func :value
                   :classname "pure-u-23-24"
-                  :selected (om/get-state owner :selected)
+                  :selected (name (om/get-state owner :selected))
                   :onchange-func
                   (fn [x]
                     (om/set-state! owner :selected (keyword (-> x .-target .-value)))
@@ -185,10 +185,9 @@
       (go
         (loop [c (<! (timeout 5000))]
           (serve/get-data {:key key :type ::blast-done?}
-                          #(do (ut/log %)
-                               (if (= :success (:status %))
-                                 (om/set-state! owner :done? (:result %))
-                                 (ut/error-redirect %))))
+                          #(if (= :success (:status %))
+                             (om/set-state! owner :done? (:result %))
+                             (ut/error-redirect %)))
           (if-not (om/get-state owner :done?) (recur (<! (timeout 5000))))))
       (go
         (loop [c (<! (timeout 5000))]
@@ -196,35 +195,43 @@
           (recur (<! (timeout 5000))))))
     om/IRenderState
     (render-state [_ {:keys [count done?] :as s}]
-      (ut/log key s)
       (if done?
-        (set! js/window.location (str "/prots/" key "/" 0))
-        (dom/div
-         nil
-         (dom/div nil "Running search")
-         (dom/div #js {:className "loader"} ""))))))
+        (set! js/window.location (str "/prots/" key "/" 0)))
+      (dom/div
+       nil
+       (dom/div nil "Running search")
+       (dom/div #js {:className "loader"} "")))))
 
-;; (defn- check-blast-input
-;;   [text program]
-;;   (let [allowed (if (#{"blastx" "blastp"} program)
-;;                   (re-pattern "[^ A B C D E F G H I K L M N P Q R S T V W X Y Z *]")
-;;                   (re-pattern "[^ A C G T R Y S W K M B D H V N . -]"))]
-;;     (if-let [v (if (= \> (first value))
-;;                  (-> (split-lines value) second)
-;;                  value)]
-;;       (cond (= (trim v) "")
-;;             "No sequence entered."
-;;             ()))))
+(defn- check-blast-input
+  [text program]
+  (let [disallowed (if (#{"blastx" "blastp"} program)
+                     (re-pattern "[^ A B C D E F G H I K L M N P Q R S T V W X Y Z *]")
+                     (re-pattern "[^ A C G T R Y S W K M B D H V N . -]"))]
+    (let [v (if (= \> (first text))
+              (first (fa/fasta-seq text))
+              {:accession 1 :description "User submitted sequence"
+               :sequence (trim (apply str (split-lines text)))})
+          dis (re-seq disallowed (:sequence v))]
+      (cond (= (trim (:sequence v)) "")
+            {:msg "No valid sequence found."}
+            (seq dis)
+            {:msg (str "Disallowed characters in sequence: " (->> (interpose "," dis)
+                                                                  (apply str)))}
+            :else
+            v))))
 
 (defn blast-submit
   [{:keys [text program] :as state} owner]
-  (if (= (trim text) "")
-    (js/alert "No sequence entered!")
-    (serve/search-key {:type ::blast :data (-> (dissoc state :change)
-                                               (dissoc state :key))}
-                      #(if (= :success (:status %))
-                         (om/set-state! owner :key (:key %))
-                         (ut/error-redirect %)))))
+  (let [s (check-blast-input text program)]
+    (if (:msg s)
+      (js/alert (:msg s))
+      (serve/search-key {:type ::blast :data (-> (dissoc state :change)
+                                                 (dissoc :key)
+                                                 (dissoc :text)
+                                                 (assoc :sequence s))}
+                        #(if (= :success (:status %))
+                           (om/set-state! owner :key (:key %))
+                           (ut/error-redirect %))))))
 
 (defn blast
   [_ owner]

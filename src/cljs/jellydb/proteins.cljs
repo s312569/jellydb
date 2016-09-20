@@ -212,6 +212,10 @@
   [t o]
   (not (om/get-state o :annotations?)))
 
+(defmethod menu-disabled? :homology
+  [t o]
+  (not (om/get-state o :homologies?)))
+
 (defn- bottom-link
   [[text tag] owner]
   (let [cs (om/get-state owner :visible)
@@ -294,18 +298,21 @@
                   (-> (cons ["Blast" :blast] v)
                       vec)
                   v))
-       :annotations? false})
+       :annotations? false
+       :homologies? false})
     om/IWillMount
     (will-mount [_]
       (serve/get-data-check {:type ::annotations? :accession (:accession protein)}
                             :annotations?
+                            owner)
+      (serve/get-data-check {:type ::homologies? :accession (:accession protein)}
+                            :homologies?
                             owner))
     om/IWillReceiveProps
     (will-receive-props [_ np]
       (om/set-state! owner :visible :none))
     om/IRenderState
     (render-state [_ {:keys [visible views]}]
-      (ut/log protein)
       (dom/div
        #js {:className "pdisplay"}
        (dom/div
@@ -438,15 +445,29 @@
                            (om/set-state! owner :key key))
                        (ut/error-redirect %)))))
 
-(defn search-report
+(def dbname {:jdb-mrna "mRNA" :jdb-cds "CDS" :jdb-prot "predicted proteins"})
+
+(defmulti search-report :search-type)
+
+(defmethod search-report :default
+  [s]
+  (dom/div
+   #js {:className "pure-u-1-1"}
+   (dom/p nil "")))
+
+(defmethod search-report :text-proteins
   [{:keys [search] :as search-data}]
-  (if (string? search)
-    (dom/div
-     #js {:className "pure-u-1-1"}
-     (if search
-       (dom/p nil (str "Showing results for search '" search "'"))
-       (dom/p nil "")))
-    (dom/div nil "")))
+  (dom/div
+   #js {:className "pure-u-1-1"}
+   (dom/p nil (str "Showing results for search '" search "'"))))
+
+(defmethod search-report :blast-search
+  [{:keys [search] :as search-data}]
+  (dom/div
+   #js {:className "pure-u-1-1"}
+   (dom/p nil (str "Blast search of " (dbname (:database search))
+                   " database using " (:program search)
+                   " and minimum e-value of " (:evalue search) "."))))
 
 (defn proteins
   [{:keys [offset key] :as app} owner]
@@ -465,7 +486,6 @@
             (get-proteins app owner)))
     om/IRenderState
     (render-state [_ {:keys [prots ekey]}]
-      (ut/log @app-state)
       (dom/div
        #js {:className "pure-u-1-1"}
        (om/build navigation app)
@@ -480,8 +500,32 @@
           (om/build-all protein prots)))
        (om/build navigation app)))))
 
+(defmulti no-results :search-type)
+
+(defmethod no-results :default
+  [s]
+  (dom/div
+   #js {:className "pure-u-1-1"}
+   (dom/p nil "")))
+
+(defmethod no-results :text-proteins
+  [{:keys [search] :as search-data}]
+  (dom/div
+   #js {:className "pure-u-1-1"}
+   (dom/p nil "No results for search of '" search "'.")))
+
+(defmethod no-results :blast-search
+  [{:keys [search] :as search-data}]
+  (dom/div
+   #js {:className "pure-u-1-1"}
+   (dom/p nil (str "No results for blast search of " (dbname (:database search))
+                   " database using " (:program search)
+                   " and minimum e-value of " (:evalue search) "."))
+   (dom/a #js {:href "/blast" :className "pure-button pure-button-primary"}
+          "New BLAST search")))
+
 (defn protein-outer
-  [{:keys [offset key] :as app} owner]
+  [{:keys [offset key scount] :as app} owner]
   (om/component
    (dom/div
     #js {:className "hcenter"}
@@ -494,17 +538,19 @@
        (dom/div
         #js {:className "hdisplay hcenter"}
         (om/build ts/search "New search ...")))
-      (search-report app)
-      (om/build proteins app))))))
+      (if (> scount 0)
+        (dom/div
+         nil
+         (search-report app)
+         (om/build proteins app))
+        (no-results app)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; routing
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(acc/configure-navigation! {:nav-handler (fn [path]
-                                           (sec/dispatch! path))
-                            :path-exists? (fn [path]
-                                            (sec/locate-route path))})
+(acc/configure-navigation! {:nav-handler (fn [path] (sec/dispatch! path))
+                            :path-exists? (fn [path] (sec/locate-route path))})
 
 (declare get-search)
 
@@ -524,7 +570,8 @@
                   #(if (= :success (:status %))
                      (reset! app-state {:offset 0 :key key :selected []
                                         :scount (:count (:data %))
-                                        :search (:data (:data %))})
+                                        :search (:data (:data %))
+                                        :search-type (:search-type (:data %))})
                      (ut/error-redirect %))))
 
 (defn ^:export init [key]

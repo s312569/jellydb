@@ -6,7 +6,6 @@
 
 (defn- get-ekey
   [owner table]
-  (ut/log (om/get-state owner :dataset))
   (serve/search-key {:type ::dataset :table table :did (:id (om/get-state owner :dataset))}
                     (fn [x]
                       (if (= :success (:status x))

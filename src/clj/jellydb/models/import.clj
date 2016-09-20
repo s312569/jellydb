@@ -3,10 +3,12 @@
             [jellydb.models.ips :as ip]
             [jellydb.models.db :refer :all]
             [jellydb.models.utilities :refer [working-directory working-file]]
+            [jellydb.models.userblast :as bl]
             [biodb.core :as bdb]
             [clj-fasta.core :refer [fasta->file]]
             [me.raynes.fs :refer [delete delete-dir]]
-            [clj-commons-exec :refer [sh]]))
+            [clj-commons-exec :refer [sh]]
+            [clojure.string :as st]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; importing functions
@@ -92,6 +94,19 @@
           (delete (str tf f)))
         (delete-dir (str tf ".transdecoder_dir"))))))
 
+(defn- internal-blast-db
+  [did {:keys [species]}]
+  (let [f (str "/home/jason/Dropbox/jellydb/resources/internal-blast/"
+               (-> (st/lower-case species)
+                   (st/replace #"\s" "-"))
+               "-"
+               did)
+        fu #(fasta->file % f :append false)]
+    (apply-to-dataset {:table :peptides :func fu :did did})
+    (bl/create-blastdb-from-file f "prot")
+    (bdb/insert-sequences! dbspec :blastfiles :blast-file
+                           [{:did did :file f :type "prot"}])))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; import api
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -109,6 +124,8 @@
     (bdb/with-transaction [con dbspec]
       (transdecode @did con))
     (bdb/with-transaction [con dbspec]
+      (internal-blast-db @did m))
+    (bdb/with-transaction [con dbspec]
       (blast-dataset @did))
     (bdb/with-transaction [con dbspec]
       (ip/ips-dataset @did))))
@@ -118,7 +135,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (def test-submit
-  {:files ["/home/jason/Dropbox/jellydb/resources/test-data/test.fasta"]
+  {:files ["/home/jason/Dropbox/jellydb/resources/test-data/chironex-assembly.fasta"]
    :submitter {:first "Jason"
                :last "Mulvenna"
                :email "jason.mulvenna@gmail.com"
@@ -126,5 +143,7 @@
    :dataset {:name "test"
              :abstract "this is an abstract"
              :pmid ["123456" "78910"]
-             :species "S. pecies"
+             :species "Chironex fleckeri"
              :type :assembly}})
+
+

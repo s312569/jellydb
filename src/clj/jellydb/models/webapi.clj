@@ -50,8 +50,7 @@
     (if (future-done? (:future s))
       (let [br @(:future s)]
         (swap! search-keys #(-> (update-in % [key] (fn [x] (merge x br)))
-                                (update-in [key] (fn [x] (dissoc x :future)))
-                                (update-in [key :data] (fn [x] (dissoc x :text)))))
+                                (update-in [key] (fn [x] (dissoc x :future)))))
         {:status :success :result true})
       {:status :success :result false})
     {:status :failure :message "Blast key doesn't exist."}))
@@ -86,6 +85,7 @@
 (derive :jellydb.proteins/cds :jellydb.proteins/dna)
 (derive :jellydb.proteins/mrna :jellydb.proteins/dna)
 (derive :jellydb.proteins/annotations? :jellydb.annotation-view/ips)
+(derive :jellydb.proteins/homologies? :jellydb.homology-view/blasts)
 
 (defmethod serve/get-data :jellydb.proteins/dna
   [{:keys [accession] :as m}]
@@ -111,11 +111,24 @@
     {:status :success :data (first r)}
     {:status :failure :message "Something wrong with dataset retrieval."}))
 
+(defmethod serve/get-data :jellydb.homology-view/db-name
+  [{:keys [did] :as m}]
+  (if-let [r (get-sequences m)]
+    {:status :success :data r}
+    {:status :failure :message "Something wrong with dataset name retrieval."}))
+
 (defmethod serve/get-data :jellydb.homology-view/blasts
   [{:keys [accession] :as m}]
   (if-let [r (get-sequences (assoc m :accessions [accession]))]
     {:status :success :data r}
     {:status :failure :message "Something wrong with blast retrieval by accession."}))
+
+(defmethod serve/get-data :jellydb.proteins/homologies?
+  [{:keys [accession] :as m}]
+  (let [r (get-sequences (assoc m :accessions [accession]))]
+    (if r
+      {:status :success :data (if (> (count r) 0) true false)}
+      {:status :failure :message "Something wrong with annotations query."})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; file retrieval 

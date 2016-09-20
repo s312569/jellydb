@@ -167,7 +167,6 @@
            :description "GO Terms"
            :data
            (map (fn [i]
-                  (ut/log i)
                   (let [host (str (gensym) "-" (:id i))]
                     {:link
                      (dom/a

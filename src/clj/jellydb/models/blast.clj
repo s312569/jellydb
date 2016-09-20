@@ -6,29 +6,28 @@
             [biodb.core :as bdb]
             [clojure.java.io :refer [reader]]
             [clojure.edn :as edn]
-            [fs.core :refer [delete]]))
+            [me.raynes.fs :as fs]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; importing
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def blast-dbs [{:file "/home/jason/Dropbox/jellydb/resources/blast/test.fasta"
-                 :name "Test"
-                 :id-parse #(if (re-find #"^gnl\|" %)
-                              (second (split % #"\|" 2))
-                              %)}])
+(defn- parse-id
+  [id]
+  (if (re-find #"^gnl\|" id)
+    (second (split id #"\|" 2))
+    id))
 
 (defn blast-dataset
   [did]
   (let [func #(doall
-               (map
-                (fn [x]
-                  {:files (bl/blast % "blastp" (:file x) (working-file (:name x))
-                                    :params {"-max_target_seqs" "1"})
-                   :db x})
-                blast-dbs))
+               (map (fn [x]
+                      {:files (bl/blast % "blastp" (:file x) (working-file "blast")
+                                        :params {"-max_target_seqs" "1"})
+                       :did (:did x)})
+                    (internal-blast-dbs did)))
         blasts (apply-to-dataset {:table :peptides :func func :did did})]
-    (doseq [{:keys [files db]} blasts]
+    (doseq [{:keys [files did]} blasts]
       (try
         (dorun (map (fn [file]
                       (with-open [r (reader file)]
@@ -36,13 +35,13 @@
                              (map #(bl/hit-seq % :evalue 10e-5))
                              (map first)
                              (remove nil?)
-                             (map #(update-in % [:Hit_id] (:id-parse db)))
-                             (map #(hash-map :hit % :database (:name db)
+                             (map #(update-in % [:Hit_id] parse-id))
+                             (map #(hash-map :hit % :database did
                                              :accession (:query-accession %)))
                              (insert-sequences :blasts))))
                     files))
         (finally
-          (dorun (map delete files)))))))
+          (dorun (map fs/delete files)))))))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ;; databases

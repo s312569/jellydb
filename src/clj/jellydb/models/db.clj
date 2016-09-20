@@ -1,10 +1,11 @@
 (ns jellydb.models.db
   (:require [clojure.java.io :refer [reader]]
             [biodb.core :as bdb]
-            [clj-fasta.core :refer [fasta-seq]]
+            [clj-fasta.core :refer [fasta-seq fasta->file]]
             [clojure.java.jdbc :as db]
             [clj-interproscan.core :as ips]
             [jellydb.models.userblast :as bl]
+            [clojure.string :as string]
             [clojure.edn :as edn]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -20,6 +21,31 @@
 ;; creation
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(declare fasta-insert)
+
+(defn- import-swissprot
+  []
+  (let [f "/home/jason/Dropbox/jellydb/resources/internal-blast/swissprot"]
+    (bdb/with-transaction [con dbspec]
+      (let [sid (->> (bdb/insert-sequences! con :submitters :submitter
+                                            [{:first "DB"
+                                              :last "Maintainer"
+                                              :email ""
+                                              :address "Here"}])
+                     first
+                     :id)
+            did (->> (bdb/insert-sequences! con :datasets :dataset
+                                            [{:name "SwissProt"
+                                              :abstract "SwissProt data"
+                                              :species "All"
+                                              :submitter sid
+                                              :type "proteins"}])
+                     first
+                     :id)]
+        (fasta-insert [f] :swissprots :swissprot did con)
+        (bdb/insert-sequences! con :blastfiles :blast-file
+                               [{:did did :file f :type "prot"}])))))
+
 (defn create-database
   []
   (bdb/create-table! dbspec :submitters :submitter)
@@ -30,7 +56,10 @@
   (bdb/create-table! dbspec :cdss :cds)
   (bdb/create-table! dbspec :contigs :contig)
   (bdb/create-table! dbspec :blasts :jdb-blast)
-  (bdb/create-table! dbspec :interproscan :ips))
+  (bdb/create-table! dbspec :interproscan :ips)
+  (bdb/create-table! dbspec :blastfiles :blast-file)
+  (bdb/create-table! dbspec :swissprots :swissprot)
+  (import-swissprot))
 
 (defn delete-database
   []
@@ -39,7 +68,7 @@
                              (db/drop-table-ddl %))
           (catch Exception _))
        [:pmids :datasets :submitters :peptides :contigs :blasts
-        :mrnas :cdss :interproscan]))
+        :mrnas :cdss :interproscan :blast-files]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; db methods
@@ -64,6 +93,14 @@
 (defmethod bdb/restore-sequence :default
   [q]
   (dissoc q :type))
+
+;; blast files
+
+(defmethod bdb/table-spec :blast-file
+  [q]
+  (vector [:did :integer "PRIMARY KEY"]
+          [:file :varchar "NOT NULL"]
+          [:type :varchar "NOT NULL"]))
 
 ;; submitter
 
@@ -93,6 +130,15 @@
   [q]
   (vector [:did :integer "NOT NULL"]
           [:pmid :integer "NOT NULL"]))
+
+;; swissprot
+
+(defmethod bdb/table-spec :swissprot
+  [q]
+  (vector [:accession :varchar "PRIMARY KEY"]
+          [:dataset :integer "NOT NULL"]
+          [:description :text]
+          [:sequence :text "NOT NULL"]))
 
 ;; peptides
 
@@ -143,7 +189,7 @@
   [q]
   (vector [:id :serial "PRIMARY KEY"]
           [:accession :text "NOT NULL"]
-          [:database :text "NOT NULL"]
+          [:database :integer "NOT NULL"]
           [:hit :text "NOT NULL"]))
 
 (defmethod bdb/prep-sequences :jdb-blast
@@ -199,8 +245,9 @@
 (defmethod get-sequences [:by-key :blast-search]
   [{:keys [offset file] :as m}]
   (let [blasts (bl/get-blast-hits file offset)]
-    (bdb/get-sequences dbspec :peptides :peptide (doall (map :Hit_id blasts))
-                       :apply-func #(doall (map merge blasts %)))))
+    (bdb/get-sequences dbspec :peptides :peptide (map :Hit_accession blasts)
+                       :apply-func (fn [x]
+                                     (doall (map merge blasts x))))))
 
 (defmethod get-sequences [:jellydb.proteins/select-all :text-proteins]
   [{:keys [data] :as m}]
@@ -210,9 +257,7 @@
 
 (defmethod get-sequences [:jellydb.proteins/select-all :blast-search]
   [{:keys [file] :as m}]
-  (let [r (bl/select-all-blasts file)]
-    (println r)
-    r))
+  (bl/select-all-blasts file))
 
 (defmethod get-sequences [:jellydb.proteins/select-all :only-selected]
   [{:keys [data] :as m}]
@@ -237,6 +282,11 @@
   (let [q ["select d.id,d.name,d.type,d.abstract,d.submitter,d.time,d.species,s.first,s.last,s.email,s.address from datasets d, submitters s where d.submitter = s.id and d.id=?" dataset]]
     (bdb/query-sequences dbspec q :jdb-blast)))
 
+(defmethod get-sequences :jellydb.homology-view/db-name
+  [{:keys [did] :as m}]
+  (let [q ["select name from datasets where id=?" did]]
+    (bdb/query-sequences dbspec q :jdb-blast :apply-func #(:name (first %)))))
+
 (defmethod get-sequences :jellydb.homology-view/blasts
   [{:keys [accessions] :as m}]
   (bdb/get-sequences dbspec :blasts :jdb-blast accessions
@@ -254,10 +304,25 @@
   [{:keys [table did func] :as m}]
   (apply-to-dataset {:table table :did did :func func}))
 
-(defmethod get-sequences :jellydb.models.blast/db-gen
+(defmethod get-sequences :db-gen
   [{:keys [table func]}]
   (let [q [(str "select * from " (name table))]]
     (bdb/query-sequences dbspec q (table-type table) :apply-func func)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; blast database management
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn make-jdb-blast-dbs
+  []
+  (map (fn [{:keys [file table type]}]
+         (get-sequences {:table table :func #(bl/create-blastdb % file type) :type :db-gen}))
+       (vals bl/blast-dbs)))
+
+(defn internal-blast-dbs
+  [did]
+  (bdb/query-sequences dbspec ["select * from blastfiles where did!=?" did]
+                       :blast-file))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; counting results

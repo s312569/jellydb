@@ -25,23 +25,31 @@
                 :style #js {:width "60%"}}
            (get-in dbr [:hit :Hit_def]))))
 
-(defn- db-homologies
-  [dbrs]
-  (dom/div
-   nil
-   (dom/div #js {:className "pure-u-5-5 thick greyed"}
-            (str "Similar to proteins in " (:database (first dbrs))))
-   (dom/table
-    nil
-    (dom/thead
-     nil
-     (dom/tr
-      nil
-      (dom/th #js {:className "anno-display"} "Accession")
-      (dom/th #js {:className "anno-display"} "Bit Score")
-      (dom/th #js {:className "anno-display"} "E-value")
-      (dom/th #js {:className "anno-display"} "Description")))
-    (apply dom/tbody nil (doall (map homology-data dbrs))))))
+(defn- db-homologies [dbrs owner]
+  (reify
+    om/IInitState
+    (init-state [_]
+      {:name ""})
+    om/IWillMount
+    (will-mount [_]
+      (serve/get-data-check {:type ::db-name :did (:database (first dbrs))} :name owner))
+    om/IRenderState
+    (render-state [_ {:keys [name]}]
+      (dom/div
+       nil
+       (dom/div #js {:className "pure-u-5-5 thick greyed"}
+                (str "Similar to proteins in " name))
+       (dom/table
+        nil
+        (dom/thead
+         nil
+         (dom/tr
+          nil
+          (dom/th #js {:className "anno-display"} "Accession")
+          (dom/th #js {:className "anno-display"} "Bit Score")
+          (dom/th #js {:className "anno-display"} "E-value")
+          (dom/th #js {:className "anno-display"} "Description")))
+        (apply dom/tbody nil (doall (map homology-data dbrs))))))))
 
 (defn homology-view [protein owner]
   (reify
@@ -62,4 +70,4 @@
         (dom/div
          nil
          (dom/div #js {:className "tbpadded"} "")       
-         (apply dom/div nil (map db-homologies (vals homologies))))))))
+         (apply dom/div nil (map #(om/build db-homologies %) (vals homologies))))))))
