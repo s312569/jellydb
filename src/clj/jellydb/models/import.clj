@@ -6,6 +6,7 @@
             [jellydb.models.userblast :as bl]
             [biodb.core :as bdb]
             [clj-fasta.core :refer [fasta->file]]
+            [clj-interproscan.core :as ips]
             [me.raynes.fs :refer [delete delete-dir]]
             [clj-commons-exec :refer [sh]]
             [clojure.string :as st]))
@@ -106,6 +107,113 @@
     (bl/create-blastdb-from-file f "prot")
     (bdb/insert-sequences! dbspec :blastfiles :blast-file
                            [{:did did :file f :type "prot"}])))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; annotating
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn- ips-designation
+  [s]
+  (let [l (last (st/split s #"\s+"))]
+    (str s
+         (cond (#{"domain" "Domain"} l)
+               "-containing protein"
+               (#{"protein" "Protein"} l)
+               ""
+               (#{"family" "Family"} l)
+               " protein"
+               :else
+               "-containing protein"))))
+
+(defmulti ips-description (fn [i] (get-in i [:signature :library :library])))
+
+(defmethod ips-description :default
+  [i]
+  (ips-designation (get-in i [:signature :entry :desc])))
+
+(defmethod ips-description "PROSITE_PROFILES"
+  [i]
+  (ips-designation (get-in i [:signature :desc])))
+
+(defmethod ips-description "PFAM"
+  [i]
+  (ips-designation (get-in i [:signature :desc])))
+
+(defmethod ips-description "SUPERFAMILY"
+  [i]
+  (ips-designation (get-in i [:signature :name])))
+
+(defmulti ips-score (fn [i] (get-in i [:signature :library :library])))
+
+(defmethod ips-score :default
+  [i]
+  (:score i))
+
+(defmethod ips-score "PROSITE_PROFILES"
+  [i]
+  (-> (:locations i)
+      first
+      :score))
+
+(defmethod ips-score "PFAM"
+  [i]
+  (:score i))
+
+(defmethod ips-score "SUPERFAMILY"
+  [i]
+  (:evalue i))
+
+(defn- ordered-ips-get
+  [ic]
+  (if-let [f (fn [t] (-> (filter #(= t (get-in % [:signature :library :library])) ic)
+                         first))]
+    (or (f "PFAM")
+        (f "SUPERFAMILY")
+        (f "PROSITE_PROFILES")
+        (let [gid (f "GENE3D")]
+          (if (get-in gid [:signature :entry :desc])
+            gid)))))
+
+(defn- swissprot?
+  [acc]
+  (if-let [b (get-custom ["select hit from blasts,datasets
+                           where accession=?
+                                 and blasts.database=datasets.id
+                                 and datasets.name='SwissProt'"
+                          acc]
+                         :jdb-blast
+                         :apply-func #(-> (first %) :hit))]
+    {:description (second (re-find #"(.*)\sOS=" (:Hit_def b)))
+     :accession acc
+     :evidence "By similarity"
+     :score (-> (:hsps b) first :Hsp_bit-score)
+     :database "SwissProt"}))
+
+(defn- ips?
+  [acc]
+  (if-let [i (-> (get-sequences {:type :jellydb.annotation-view/ips :accessions [acc]})
+                 ordered-ips-get)]
+    {:description (ips-description i)
+     :accession acc
+     :evidence "By similarity"
+     :score (Float/parseFloat (ips-score i))
+     :database (get-in i [:signature :library :library])}))
+
+(defn- annotation
+  [accession]
+  (or (swissprot? accession) (ips? accession)
+      {:description "Hypothetical protein"
+       :accession accession
+       :evidence nil
+       :score nil
+       :database nil}))
+
+(defn- annotate
+  [did]
+  (apply-to-dataset {:table :peptides :did did
+                     :func #(dorun (->> (map (fn [x] (annotation (:accession x))) %)
+                                        (remove nil?)
+                                        (insert-sequences :annotations)))}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; import api

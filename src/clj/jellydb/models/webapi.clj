@@ -84,8 +84,6 @@
 
 (derive :jellydb.proteins/cds :jellydb.proteins/dna)
 (derive :jellydb.proteins/mrna :jellydb.proteins/dna)
-(derive :jellydb.proteins/annotations? :jellydb.annotation-view/ips)
-(derive :jellydb.proteins/homologies? :jellydb.homology-view/blasts)
 
 (defmethod serve/get-data :jellydb.proteins/dna
   [{:keys [accession] :as m}]

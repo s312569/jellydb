@@ -87,8 +87,9 @@
          (interpose \newline)
          (apply str))))
 
-(defn- fasta-format [{:keys [description sequence]}]
+(defn- fasta-format [{:keys [accession description sequence]}]
   (str ">"
+       accession " "
        (->> (subs description 0 67)
             (map #(apply str %))
             (apply str))
@@ -150,11 +151,26 @@
           #js {:className "sequence-fixed"}
           (if (= format :ladder)
             (numbered-format sequence)
-            (fasta-format {:description (:description protein) :sequence sequence}))))))))
+            (fasta-format {:description (:description protein) :sequence sequence
+                           :accession (:accession protein)}))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; protein card
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmulti score-desc (fn [a] (:database a)))
+
+(defmethod score-desc :default
+  [a]
+  " Score: ")
+
+(defmethod score-desc "SwissProt"
+  [a]
+  " Bit score: ")
+
+(defmethod score-desc "SUPERFAMILY"
+  [a]
+  " Evalue: ")
 
 (defn- protein-lower-info
   [protein]
@@ -162,45 +178,39 @@
    #js {:className "pure-u-1-1"}
    (dom/div #js {:className "pure-u-1-24"} "")
    (dom/div
-    #js {:className "pure-u-5-24 protsumm" :style #js {:text-align "left"}}
-    (str (count (:sequence protein)) " amino acid protein"))
-   (dom/div
-    #js {:className "pure-u-18-24 protsumm" :style #js {:text-align "left"}}
-    (str "JellyDB accession: " (:accession protein)))))
-
-(defn selected?
-  [accession]
-  (let [s (:selected @app-state)]
-    (if (some #{accession} s)
-      true
-      false)))
-
-(defn fix-selected
-  [accession]
-  (if (selected? accession)
-    (swap! app-state #(assoc % :selected (vec (remove #{accession} (:selected %)))))
-    (swap! app-state #(assoc % :selected (vec (conj (:selected %) accession))))))
+    #js {:className "pure-u-23-24 protsumm" :style #js {:text-align "left"}}
+    (str (count (:sequence protein)) " amino acid protein; "
+         (if (:evidence protein)
+           (str "Annotation evidence: " (:evidence protein) ";"
+                (score-desc protein) (:score protein) ";"
+                " Database: " (:database protein)))))))
 
 (defn- protein-cb
   [protein]
-  (let [s (selected? (:accession protein))]
+  (let [selected? (fn [accession]
+                    (let [s (:selected @app-state)]
+                      (if (some #{accession} s)
+                        true
+                        false)))]
     (dom/div
      #js {:className "pure-u-1-24"}
      (dom/input
       #js {:type "checkbox"
-           :checked s
-           :onChange #(fix-selected (:accession protein))}))))
+           :checked (selected? (:accession protein))
+           :onChange
+           #(let [accession (:accession protein)]
+              (if (selected? accession)
+                (swap! app-state
+                       (fn [x] (assoc x :selected (vec (remove #{accession} (:selected x))))))
+                (swap! app-state
+                       (fn [x] (assoc x :selected (vec (conj (:selected x) accession)))))))}))))
 
 (defn- protein-description
   [protein]
-  (dom/div
-   #js {:className "pure-u-23-24 thick" :style #js {:text-align "left"}}
-   (str (:accession protein) " - " (if (> (count (:description protein)) 70)
-                                     (str (->> (:description protein)
-                                               (take 70)
-                                               (apply str))
-                                          " ...")
-                                     (:description protein)))))
+  (let [tf #(if (> (count %) 70) (str (->> % (take 70) (apply str)) " ...") %)]
+    (dom/div
+     #js {:className "pure-u-23-24 thick" :style #js {:text-align "left"}}
+     (str (:accession protein) " - " (tf (:description protein))))))
 
 (defmulti menu-disabled? (fn [t o] t))
 
@@ -227,15 +237,17 @@
                            "pure-menu-item pure-menu-disabled"
                            :else
                            "pure-menu-item my-cursor")}
-     (dom/a
-      #js {:className "pure-menu-link"
-           :disabled "true"
-           :onClick (fn [x]
-                      (and (not dis?)
-                           (if (= tag cs)
-                             (om/set-state! owner :visible :none)
-                             (om/set-state! owner :visible tag))))}
-      text))))
+     (if-not dis?
+       (dom/a
+        #js {:className "pure-menu-link"
+             :disabled "true"
+             :onClick (fn [x]
+                        (and (not dis?)
+                             (if (= tag cs)
+                               (om/set-state! owner :visible :none)
+                               (om/set-state! owner :visible tag))))}
+        text)
+       text))))
 
 (defn- bottom-menu
   [protein owner]
@@ -310,13 +322,19 @@
                             owner))
     om/IWillReceiveProps
     (will-receive-props [_ np]
-      (om/set-state! owner :visible :none))
+      (om/set-state! owner :visible :none)
+      (serve/get-data-check {:type ::annotations? :accession (:accession np)}
+                            :annotations?
+                            owner)
+      (serve/get-data-check {:type ::homologies? :accession (:accession np)}
+                            :homologies?
+                            owner))
     om/IRenderState
     (render-state [_ {:keys [visible views]}]
       (dom/div
        #js {:className "pdisplay"}
        (dom/div
-        #js {:className "pure-g"}
+        #js {:className "pure-u-1-1"}
         (protein-cb protein)
         (protein-description protein)
         (protein-lower-info protein)
@@ -447,28 +465,6 @@
 
 (def dbname {:jdb-mrna "mRNA" :jdb-cds "CDS" :jdb-prot "predicted proteins"})
 
-(defmulti search-report :search-type)
-
-(defmethod search-report :default
-  [s]
-  (dom/div
-   #js {:className "pure-u-1-1"}
-   (dom/p nil "")))
-
-(defmethod search-report :text-proteins
-  [{:keys [search] :as search-data}]
-  (dom/div
-   #js {:className "pure-u-1-1"}
-   (dom/p nil (str "Showing results for search '" search "'"))))
-
-(defmethod search-report :blast-search
-  [{:keys [search] :as search-data}]
-  (dom/div
-   #js {:className "pure-u-1-1"}
-   (dom/p nil (str "Blast search of " (dbname (:database search))
-                   " database using " (:program search)
-                   " and minimum e-value of " (:evalue search) "."))))
-
 (defn proteins
   [{:keys [offset key] :as app} owner]
   (reify
@@ -524,26 +520,53 @@
    (dom/a #js {:href "/blast" :className "pure-button pure-button-primary"}
           "New BLAST search")))
 
+(defmulti search-report :search-type)
+
+(defmethod search-report :default
+  [s]
+  (dom/div
+   #js {:className "pure-u-1-1"}
+   (dom/p nil "")))
+
+(defmethod search-report :text-proteins
+  [{:keys [search] :as search-data}]
+  (dom/div
+   #js {:className "pure-u-1-1"}
+   (dom/p nil (str "Showing results for search '" search "'"))))
+
+(defmethod search-report :blast-search
+  [{:keys [search] :as search-data}]
+  (dom/div
+   #js {:className "pure-u-1-1"}
+   (dom/p nil (str "Blast search of " (dbname (:database search))
+                   " database using " (:program search)
+                   " and minimum e-value of " (:evalue search) "."))))
+
 (defn protein-outer
   [{:keys [offset key scount] :as app} owner]
   (om/component
    (dom/div
     #js {:className "hcenter"}
     (dom/div
-     #js {:style #js {:clear "both"}}
+     #js {:className "pure-g"}
      (dom/div
-      #js {:className "pure-g padded"}
+      #js {:className "pure-u-1-1"}
+      (ut/nav-links "Proteins"))
+     (dom/div
+      #js {:style #js {:clear "both"}}
       (dom/div
-       #js {:className "pure-u-1-1"}
+       #js {:className "padded"}
        (dom/div
-        #js {:className "hdisplay hcenter"}
-        (om/build ts/search "New search ...")))
-      (if (> scount 0)
+        #js {:className "pure-u-1-1"}
         (dom/div
-         nil
-         (search-report app)
-         (om/build proteins app))
-        (no-results app)))))))
+         #js {:className "hdisplay hcenter"}
+         (om/build ts/search "New search ...")))
+       (if (> scount 0)
+         (dom/div
+          nil
+          (search-report app)
+          (om/build proteins app))
+         (no-results app))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; routing

@@ -121,8 +121,7 @@
     {:link (om/build annotation-link i)
      :database (get-in i [:signature :library :library])
      :signature (annotation-desc i)
-     :sketch {:ac host :locations (:locations i)
-              :seq-length (:sl i)}
+     :sketch {:ac host :locations (:locations i) :seq-length (:sl i)}
      :canvas (dom/canvas #js {:id host :width "100" :height "30"})}))
 
 (defmethod annotations-data "TMHMM"

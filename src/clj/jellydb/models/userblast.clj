@@ -73,7 +73,10 @@
   [file offset]
   (let [q ["select * from sequences order by hitnum limit 20 OFFSET ?" offset]
         db (bdb/db-spec {:dbname file :dbtype :sqlite})]
-    (bdb/query-sequences db q :user-blast)))
+    (bdb/query-sequences db q :user-blast
+                         :apply-func #(->> (map (fn [x]
+                                                  (vector (:Hit_accession x) x)) %)
+                                           (into {})))))
 
 (defn select-all-blasts
   [file]

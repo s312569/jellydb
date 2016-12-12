@@ -260,26 +260,31 @@
       (if key
         (om/build blast-waiting s)
         (dom/div
-         #js {:className "annopadded"}
+         nil
          (dom/div
-          #js {:className "pure-form pure-form-stacked"}
-          (dom/fieldset
-           nil
-           (dom/div
-            #js {:className "pure-g"}
-            (om/build sequence-box s)
-            (om/build program-select s)
-            (om/build database-select s)
-            (om/build evalue-select s)
-;;            (om/build matrix-select s)
-            (om/build gapped-select s)
-            (om/build return-select s)
-            (dom/div #js {:className "padded pure-u-1-1"}
-                     (dom/button
-                      #js {:className
-                           "pure-button pure-button-primary pure-u-1"
-                           :onClick #(blast-submit s owner)}
-                      "Go"))))))))))
+          #js {:className "hcenter"}
+          (ut/nav-links "Blast"))
+         (dom/div
+          #js {:className "pure-g padded"}
+          (dom/div
+           #js {:className "pure-form pure-form-stacked"}
+           (dom/fieldset
+            nil
+            (dom/div
+             #js {:className "pure-g"}
+             (om/build sequence-box s)
+             (om/build program-select s)
+             (om/build database-select s)
+             (om/build evalue-select s)
+             ;;            (om/build matrix-select s)
+             (om/build gapped-select s)
+             (om/build return-select s)
+             (dom/div #js {:className "padded pure-u-1-1"}
+                      (dom/button
+                       #js {:className
+                            "pure-button pure-button-primary pure-u-1"
+                            :onClick #(blast-submit s owner)}
+                       "Go")))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; init

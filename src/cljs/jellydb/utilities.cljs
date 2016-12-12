@@ -66,3 +66,14 @@
                   #js {:value (value-func %)}
                   (label-func %)))
           records)))))
+
+(defn nav-links
+  [current]
+  (let [ls {"Home" "/" "Blast" "/blast" "Datasets" "#"}]
+    (apply dom/div
+           nil
+           (->> (mapcat (fn [[k v]]
+                          [(dom/a #js {:href v} k)
+                           (dom/span nil " | ")])
+                        (dissoc ls current))
+                drop-last))))
