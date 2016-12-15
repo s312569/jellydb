@@ -30,7 +30,8 @@
                  [com.taoensso/sente "1.8.1"]
                  [secretary "1.2.3"]
                  [venantius/accountant "0.1.7"]
-                 [clj-tandem "0.1.6"]]
+                 [clj-tandem "0.1.6"]
+                 [clj-mzml "0.1.0"]]
   :plugins [[lein-cljsbuild "1.1.3"]
             [lein-figwheel "0.5.4-7"]]
   :clean-targets ^{:protect false} ["resources/public/js/out"
