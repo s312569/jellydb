@@ -97,11 +97,11 @@
     {:status :success :data r}
     {:status :failure :message "Something wrong with ips retrieval by accession."}))
 
-(defmethod serve/get-data :jellydb.proteins/annotations?
+(defmethod serve/get-data :jellydb.proteomics/proteomics
   [{:keys [accession] :as m}]
   (if-let [r (get-sequences (assoc m :accessions [accession]))]
-    {:status :success :data (if (seq r) true false)}
-    {:status :failure :message "Something wrong with annotations query."}))
+    {:status :success :data r}
+    {:status :failure :message "Something wrong with proteomics retrieval by accession."}))
 
 (defmethod serve/get-data :jellydb.dataset-view/dataset
   [{:keys [dataset] :as m}]
@@ -121,12 +121,25 @@
     {:status :success :data r}
     {:status :failure :message "Something wrong with blast retrieval by accession."}))
 
+;; queries
+
+(defmethod serve/get-data :jellydb.proteins/annotations?
+  [{:keys [accession] :as m}]
+  (if-let [r (get-sequences (assoc m :accessions [accession]))]
+    {:status :success :data (if (seq r) true false)}
+    {:status :failure :message "Something wrong with annotations query."}))
+
 (defmethod serve/get-data :jellydb.proteins/homologies?
   [{:keys [accession] :as m}]
-  (let [r (get-sequences (assoc m :accessions [accession]))]
-    (if r
-      {:status :success :data (if (> (count r) 0) true false)}
-      {:status :failure :message "Something wrong with annotations query."})))
+  (if-let [r (get-sequences (assoc m :accessions [accession]))]
+    {:status :success :data (if (seq r) true false)}
+    {:status :failure :message "Something wrong with homologies query."}))
+
+(defmethod serve/get-data :jellydb.proteins/proteomics?
+  [{:keys [accession] :as m}]
+  (if-let [r (get-sequences (assoc m :accessions [accession]))]
+    {:status :success :data (if (seq r) true false)}
+    {:status :failure :message "Something wrong with proteomics query."}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; file retrieval 

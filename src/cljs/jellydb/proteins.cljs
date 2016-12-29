@@ -11,6 +11,7 @@
             [jellydb.dataset-view :as data]
             [jellydb.homology-view :refer [homology-view]]
             [jellydb.blast-view :refer [blast-output-view]]
+            [jellydb.proteomics :refer [proteomics-view]]
             [secretary.core :as sec :refer-macros [defroute]]
             [accountant.core :as acc]))
 
@@ -201,9 +202,11 @@
            #(let [accession (:accession protein)]
               (if (selected? accession)
                 (swap! app-state
-                       (fn [x] (assoc x :selected (vec (remove #{accession} (:selected x))))))
+                       (fn [x] (assoc x :selected
+                                      (vec (remove #{accession} (:selected x))))))
                 (swap! app-state
-                       (fn [x] (assoc x :selected (vec (conj (:selected x) accession)))))))}))))
+                       (fn [x] (assoc x :selected
+                                      (vec (conj (:selected x) accession)))))))}))))
 
 (defn- protein-description
   [protein]
@@ -220,11 +223,15 @@
 
 (defmethod menu-disabled? :annotation
   [t o]
-  (not (om/get-state o :annotations?)))
+  (not (om/get-state o ::annotations?)))
 
 (defmethod menu-disabled? :homology
   [t o]
-  (not (om/get-state o :homologies?)))
+  (not (om/get-state o ::homologies?)))
+
+(defmethod menu-disabled? :proteomics
+  [t o]
+  (not (om/get-state o ::proteomics?)))
 
 (defn- bottom-link
   [[text tag] owner]
@@ -293,6 +300,7 @@
             :dataset (om/build data/dataset-view protein)
             :homology (om/build homology-view protein)
             :blast (om/build blast-output-view protein)
+            :proteomics (om/build proteomics-view protein)
             nil))))))))
 
 (defn- protein [protein owner]
@@ -305,30 +313,28 @@
                         ["mRNA" :mrna]
                         ["Annotations" :annotation]
                         ["Homologies" :homology]
+                        ["Proteomics" :proteomics]
                         ["Datasets" :dataset]]]
                 (if (:Hit_id protein)
                   (-> (cons ["Blast" :blast] v)
                       vec)
                   v))
-       :annotations? false
-       :homologies? false})
+       ::annotations? false
+       ::homologies? false
+       ::proteomics? false})
     om/IWillMount
     (will-mount [_]
-      (serve/get-data-check {:type ::annotations? :accession (:accession protein)}
-                            :annotations?
-                            owner)
-      (serve/get-data-check {:type ::homologies? :accession (:accession protein)}
-                            :homologies?
-                            owner))
+      (doseq [t [::annotations? ::homologies? ::proteomics?]]
+        (serve/get-data-check {:type t :accession (:accession protein)}
+                              t
+                              owner)))
     om/IWillReceiveProps
     (will-receive-props [_ np]
       (om/set-state! owner :visible :none)
-      (serve/get-data-check {:type ::annotations? :accession (:accession np)}
-                            :annotations?
-                            owner)
-      (serve/get-data-check {:type ::homologies? :accession (:accession np)}
-                            :homologies?
-                            owner))
+      (doseq [t [::annotations? ::homologies? ::proteomics?]]
+        (serve/get-data-check {:type t :accession (:accession protein)}
+                              t
+                              owner)))
     om/IRenderState
     (render-state [_ {:keys [visible views]}]
       (dom/div
@@ -360,7 +366,8 @@
   (serve/search-key {:type ::show-selected :data (@app-state :selected)}
                     (fn [x]
                       (if (= :success (:status x))
-                        (om/set-state! owner :redirect (str "/prots/" (:key x) "/" 0))))))
+                        (om/set-state! owner :redirect
+                                       (str "/prots/" (:key x) "/" 0))))))
 
 (defn- export
   [app owner]

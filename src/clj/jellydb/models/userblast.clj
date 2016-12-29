@@ -11,15 +11,20 @@
 ;; user blast searches
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def blast-dbs {:jdb-prot {:file "/home/jason/Dropbox/jellydb/resources/blast/jdb-prot"
-                           :table :peptides
-                           :type "prot"}
-                :jdb-cds {:file "/home/jason/Dropbox/jellydb/resources/blast/jdb-cds"
-                          :table :cdss
-                          :type "nucl"}
-                :jdb-mrna {:file "/home/jason/Dropbox/jellydb/resources/blast/jdb-mrna"
-                           :table :mrnas
-                           :type "nucl"}})
+(def blast-dbs {:jdb-prot
+                {:file "/home/jason/Dropbox/jellydb/resources/blast/jdb-prot"
+                 :table :peptides
+                 :type "prot"}
+                
+                :jdb-cds
+                {:file "/home/jason/Dropbox/jellydb/resources/blast/jdb-cds"
+                 :table :cdss
+                 :type "nucl"}
+                
+                :jdb-mrna
+                {:file "/home/jason/Dropbox/jellydb/resources/blast/jdb-mrna"
+                 :table :mrnas
+                 :type "nucl"}})
 
 (defmethod bdb/table-spec :user-blast
   [q]
@@ -53,7 +58,8 @@
                (condp = gapped "Yes" false "No" true)}
               {"-evalue" evalue "-max_target_seqs" return})
           db (bdb/db-spec {:dbname (working-file "blast-db") :dbtype :sqlite})
-          blasts (bl/blast [sequence] program (:file (blast-dbs database)) f :params p)]
+          blasts (bl/blast [sequence] program (:file (blast-dbs database))
+                           f :params p)]
       (try
         (bdb/create-table! db :sequences :user-blast)
         (doall (map #(with-open [r (reader %)]
@@ -63,11 +69,11 @@
                             (bdb/insert-sequences! db :sequences :user-blast)))
                     blasts))
         {:file (str (:subname db))
-         :count (bdb/query-sequences db ["select accession from sequences"] :user-blast
+         :count (bdb/query-sequences db ["select accession from sequences"]
+                                     :user-blast
                                      :apply-func #(count %))}
         (finally
           (dorun (map delete blasts)))))))
-
 
 (defn get-blast-hits
   [file offset]

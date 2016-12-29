@@ -22,7 +22,7 @@
                  [ring-server "0.4.0"]
                  [ring/ring-core "1.5.0"]
                  [ring/ring-defaults "0.2.1"]
-                 [biodb "0.2.2"]
+                 [biodb "0.2.4"]
                  [clj-fasta "0.2.1"]
                  [clj-blast "0.2.7"]
                  [clj-interproscan "0.2.1"]
@@ -30,9 +30,11 @@
                  [com.taoensso/sente "1.8.1"]
                  [secretary "1.2.3"]
                  [venantius/accountant "0.1.7"]
-                 [clj-tandem "0.1.6"]]
+                 [clj-tandem "0.1.6"]
+                 [clj-pepxml "0.1.1"]
+                 [clj-mzml "0.1.1"]]
   :plugins [[lein-cljsbuild "1.1.3"]
-            [lein-figwheel "0.5.4-7"]]
+            [lein-figwheel "0.5.8"]]
   :clean-targets ^{:protect false} ["resources/public/js/out"
                                     "resources/public/js/app.js"]
   :figwheel {:ring-handler jellydb.handler/app}

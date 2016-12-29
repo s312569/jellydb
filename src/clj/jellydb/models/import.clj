@@ -15,35 +15,19 @@
 ;; importing functions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn- insert-dataset
-  ([{:keys [dataset] :as m} submitter] (insert-dataset m submitter dbspec))
-  ([{:keys [dataset]} submitter dbspec]
-   (bdb/with-transaction [con dbspec]
-     (let [did (-> (bdb/insert-sequences! con :datasets :dataset
-                                          [(-> (dissoc dataset :pmid)
-                                               (assoc :submitter submitter)
-                                               (update-in [:type] name))])
-                   first :id)]
-       (if-not did
-         (throw (Exception. "Something wrong in dataset insert."))
-         (bdb/insert-sequences! con :pmids :pmid
-                                (map #(hash-map :did did
-                                                :pmid (if (integer? %)
-                                                        %
-                                                        (Integer/parseInt %)))
-                                     (:pmid dataset))))
-       did))))
+(defmethod insert-dataset :sequence
+  [{:keys [dataset dbspec] :as m}]
+  (let [did (-> (bdb/insert-sequences! dbspec :datasets :dataset [dataset] true)
+                first
+                :id)]
+    (if-not did
+      (throw (Exception. "Something wrong in dataset insert.")))
+    did))
 
-(defn- insert-or-retrieve-submitter
-  ([{:keys [submitter] :as m}] (insert-or-retrieve-submitter m dbspec))
-  ([{:keys [submitter]} dbspec]
-   (if-not submitter (throw (Exception. "Submitter cannot be null")))
-   (let [qu ["select id from submitters where first=? and last=? and email=?"
-             (:first submitter) (:last submitter) (:email submitter)]]
-     (or (-> (bdb/query-sequences dbspec qu :submitter) first :id)
-         (-> (bdb/insert-sequences! dbspec :submitters :submitter [submitter])
-             first
-             :id)))))
+(defmethod insert-pmid :sequence
+  [{:keys [pmid dbspec] :as m}]
+  (if (seq pmid)
+    (bdb/insert-sequences! dbspec :pmids :pmid pmid)))
 
 (defn- insert-contigs
   ([{:keys [files] :as m} dataset] (insert-contigs m dataset dbspec))
@@ -222,12 +206,21 @@
 (defmulti import-dataset (fn [m] (get-in m [:dataset :type])))
 
 (defmethod import-dataset :assembly
-  [m]
+  [{:keys [dataset] :as m} submitter]
   (let [sid (atom nil)
         did (atom nil)]
     (bdb/with-transaction [con dbspec]
-      (reset! sid (insert-or-retrieve-submitter m con))
-      (reset! did (insert-dataset m @sid con))
+      (reset! sid (insert-or-retrieve-submitter submitter con))
+      (reset! did (insert-dataset {:dataset (-> (dissoc dataset :pmid)
+                                                (assoc :submitter @sid)
+                                                (update-in [:type] name))
+                                   :dbspec con
+                                   :type :sequence}))
+      (insert-pmid {:pmid (->> (map #(hash-map :pmid (Integer/parseInt %)
+                                               :did @did)
+                                    (:pmid dataset)))
+                    :dbspec con
+                    :type :sequence})
       (insert-contigs m @did con))
     (bdb/with-transaction [con dbspec]
       (transdecode @did con))
@@ -242,16 +235,16 @@
 ;; testing
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def test-submit
-  {:files ["/home/jason/Dropbox/jellydb/resources/test-data/chironex-assembly.fasta"]
-   :submitter {:first "Jason"
-               :last "Mulvenna"
-               :email "jason.mulvenna@gmail.com"
-               :address "QIMR Berghofer"}
-   :dataset {:name "test"
-             :abstract "this is an abstract"
-             :pmid ["123456" "78910"]
-             :species "Chironex fleckeri"
-             :type :assembly}})
+(def test-submit {:files ["/home/jason/Dropbox/jellydb/resources/test-data/chironex-assembly.fasta"]
+                  :dataset {:name "test"
+                            :abstract "this is an abstract"
+                            :pmid ["123456" "78910"]
+                            :species "Chironex fleckeri"
+                            :type :assembly}})
+
+(def test-submitter {:first "Jason"
+                     :last "Mulvenna"
+                     :email "jason.mulvenna@gmail.com"
+                     :address "QIMR Berghofer"})
 
 

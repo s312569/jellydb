@@ -203,9 +203,10 @@
            :description "Pathways"
            :data (map (fn [i]
                         (let [host (str (:ac i) "-" (:id i))]
-                          {:link (om/build annotation-link {:signature
-                                                            {:library {:library (:db i)}
-                                                             :ac (:id i)}})
+                          {:link (om/build annotation-link
+                                           {:signature
+                                            {:library {:library (:db i)}
+                                             :ac (:id i)}})
                            :database (:db i)
                            :signature (:name i)
                            :sketch {:ac host :locations (:locations i)
@@ -230,12 +231,14 @@
        :ips nil})
     om/IWillMount
     (will-mount [_]
-      (serve/get-data-check {:accession (:accession protein) :type ::ips} :ips owner))
+      (serve/get-data-check {:accession (:accession protein) :type ::ips}
+                            :ips owner))
     om/IWillReceiveProps
     (will-receive-props [_ np]
       (when-not (= (om/get-state owner :accession) (:accession np))
         (om/set-state! owner :accession (:accession np))
-        (serve/get-data-check {:accession (:accession np) :type ::ips} :ips owner)))
+        (serve/get-data-check {:accession (:accession np) :type ::ips}
+                              :ips owner)))
     om/IRenderState
     (render-state [_ {:keys [ips accession]}]
       (if-not ips
