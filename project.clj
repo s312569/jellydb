@@ -31,7 +31,7 @@
                  [secretary "1.2.3"]
                  [venantius/accountant "0.1.7"]
                  [clj-tandem "0.1.6"]
-                 [clj-pepxml "0.1.1"]
+                 [clj-pepxml "0.1.2"]
                  [clj-mzml "0.1.1"]]
   :plugins [[lein-cljsbuild "1.1.3"]
             [lein-figwheel "0.5.8"]]
