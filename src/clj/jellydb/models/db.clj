@@ -289,11 +289,14 @@
                           (if-not select
                             (str (name table)
                                  ".accession, dataset, annotations.description,"
-                                 "sequence, evidence, score, database")
+                                 "sequence, evidence, score, database,"
+                                 "datasets.species")
                             select)
                           " from " (name table)
                           " left join annotations on "
                           (name table) ".accession=annotations.accession"
+                          " left join datasets on "
+                          (name table) ".dataset=datasets.id"
                           (if where (str " where " where))
                           (if order (str " order by " (name order)))
                           (if limit (str " limit " limit))
@@ -397,13 +400,6 @@
 
 (derive :jellydb.proteins/proteomics? :jellydb.proteomics/proteomics)
 
-(defn- peptide-report
-  [c]
-  {:count (count c)
-   :peps (map #(select-keys [:num_missed_cleavages :peptide :hyperscore
-                             :massdiff :hit_rank :interprophet-prob
-                             :dataset]))})
-
 (defmethod get-sequences :jellydb.proteomics/proteomics
   [{:keys [accessions]}]
   (let [q ["select pdatasets.id,name,tissue,species,count(msmspeptides.id) as mcount
@@ -417,14 +413,23 @@
       (vector (first r))
       [])))
 
+(defmethod get-sequences :jellydb.proteomics/peptides
+  [{:keys [accession dataset]}]
+  (let [q ["select * from msmspeptides where accession=? and dataset=?"
+           accession dataset]]
+    (bdb/query-sequences dbspec q :msms-peptide)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; datasets
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmethod get-sequences :jellydb.dataset-view/dataset
-  [{:keys [dataset] :as m}]
-  (let [q ["select d.id,d.name,d.type,d.abstract,d.submitter,d.time,d.species,s.first,s.last,s.email,s.address from datasets d, submitters s where d.submitter = s.id and d.id=?" dataset]]
-    (bdb/query-sequences dbspec q :jdb-blast)))
+  [{:keys [dataset accession] :as m}]
+  (let [q ["select d.id,d.name,d.type,d.abstract,d.submitter,d.time,d.species,s.first,s.last,s.email,s.address from datasets d, submitters s where d.submitter = s.id and d.id=?" dataset]
+        ds (-> (bdb/query-sequences dbspec q :jdb-blast) first)
+        q2 ["select distinct pdatasets.* from msmspeptides,pdatasets where msmspeptides.dataset=pdatasets.id and msmspeptides.accession=?" accession]
+        ds2 (bdb/query-sequences dbspec q2 :pdataset)]
+    (assoc ds :pdatasets ds2)))
 
 (defmethod get-sequences :jellydb.homology-view/db-name
   [{:keys [did] :as m}]

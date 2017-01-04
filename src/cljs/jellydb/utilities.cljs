@@ -2,7 +2,8 @@
   (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [cljs.core.async :refer [<! chan sub put! unsub close! timeout]]
             [om.core :as om :include-macros true]
-            [om.dom :as dom :include-macros true]))
+            [om.dom :as dom :include-macros true]
+            [cljs.pprint :as pprint]))
 
 ;; logging
 
@@ -19,6 +20,14 @@
              (map (fn [[k v]]
                     (str k ":" v " ")))
              (apply str)))))
+
+;; rounding
+
+(defn round-n
+  [{:keys [n format figs] :or {format :float figs 2}}]
+  (condp = format
+    :float (pprint/cl-format nil (str "~," figs "f") n)
+    :exp (pprint/cl-format nil (str "~," figs "e") n)))
 
 ;; errors
 

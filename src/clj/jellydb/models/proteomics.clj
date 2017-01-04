@@ -182,12 +182,7 @@
                                     (-> (pep/hit-protein-accession %) first))))
                  spects)
          (filter #(>= (-> (pep/interprophet-prob %) first) mayu-score))
-         (group-by #(-> (pep/hit-protein-accession %) first))
-         (mapcat (fn [[k v]] (->> (group-by #(-> (pep/peptide %) first) v)
-                                 (map second)
-                                 (map #(sort-by (fn [x] (-> (pep/hyperscore x)
-                                                           first)) > %))
-                                 (map first))))
+         
          (map #(merge (-> (pep/peptide-hit-info %) first)
                       {:interprophet-prob (-> (pep/interprophet-prob %) first)
                        :hyperscore (-> (pep/hyperscore %) first)
@@ -196,15 +191,21 @@
                                    (mzml/get-spectra-by-index imz)
                                    first)]
                         {:mzarray (-> (mzml/mz-array s) first :array)
-                         :intensity (-> (mzml/intensity-array s) first :array)})))
-         (db/insert-sequences :msmspeptides))))
+                         :intensity (-> (mzml/intensity-array s) first :array)}))))))
 
 (defn- save-peptides
   [{:keys [interprophet-file] :as m}]
   (try (println "Storing peptides in db ...")
        (with-open [r (io/reader interprophet-file)]
-         (dorun (->> (pep/msms-run-seq r)
-                     (map #(process-msms-run m %)))))
+         (->> (pep/msms-run-seq r)
+              (mapcat #(process-msms-run m %))
+              (group-by :protein)
+              (mapcat (fn [[k v]]
+                        (->> (group-by :peptide v)
+                             (map second)
+                             (map #(sort-by :hyperscore > %))
+                             (map first))))
+              (db/insert-sequences :msmspeptides)))
        (finally (println "Peptide serialisation done!"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

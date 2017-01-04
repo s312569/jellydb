@@ -18,6 +18,31 @@
               :onClick #(get-ekey owner table)}
          text))
 
+(defn- proteomic-sets
+  [dss owner]
+  (om/component
+   (dom/div
+    nil
+    (dom/div #js {:className "pure-u-1-24 thick"} "ID")
+    (dom/div #js {:className "pure-u-8-24 thick"} "Name")
+    (dom/div #js {:className "pure-u-5-24 thick"} "Tissue")
+    (dom/div #js {:className "pure-u-7-24 thick"} "Species")
+    (dom/div #js {:className "pure-u-3-24 thick"} "Download")
+    (apply
+     dom/div
+     nil
+     (map #(dom/div
+            nil
+            (dom/div #js {:className "pure-u-1-24"} (:id %))
+            (dom/div #js {:className "pure-u-8-24"} (:name %))
+            (dom/div #js {:className "pure-u-5-24"} (:tissue %))
+            (dom/div #js {:className "pure-u-7-24"
+                          :style #js {:font-style "italic"}}
+                     (:species %))
+            (dom/a #js {:className "pure-u-3-24 flinka"}
+                   "MGF"))
+          dss)))))
+
 (defn dataset-view [protein owner]
   (reify
     om/IInitState
@@ -27,7 +52,8 @@
        :abview false})
     om/IWillMount
     (will-mount [_]
-      (serve/get-data-check {:type ::dataset :dataset (:dataset protein)}
+      (serve/get-data-check {:type ::dataset :dataset (:dataset protein)
+                             :accession (:accession protein)}
                             :dataset
                             owner))
     om/IRenderState
@@ -43,7 +69,7 @@
           #js {:className "downloadframe"
                :src (if ekey (str "/fetch?k=" ekey) "")}
           (om/set-state! owner :ekey nil))
-         (dom/div #js {:className "tbpadded"} "")         
+         (dom/div #js {:className "tbpadded"} "")
          (dom/div #js {:className "pure-u-5-5 thick hcenter greyed"} "Assembly")
          (dom/div #js {:className "pure-u-1-5 thick"} "Dataset ID:")
          (dom/div #js {:className "pure-u-4-5"} (:id dataset))
@@ -78,4 +104,11 @@
           " | "
           (download-link :cdss "CDS" owner)
           " | "
-          (download-link :peptides "Proteins" owner)))))))
+          (download-link :peptides "Proteins" owner))
+         (if (seq (:pdatasets dataset))
+           (dom/div
+            nil
+            (dom/div #js {:className "pure-u-5-5 thick hcenter greyed"
+                          :style #js {:margin-top "10px"}}
+                     "Detected in proteomics datasets:")
+            (om/build proteomic-sets (:pdatasets dataset)))))))))

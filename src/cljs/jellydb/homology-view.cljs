@@ -15,14 +15,15 @@
            (second (st/split (get-in dbr [:hit :Hit_id]) #"\|")))
    (dom/td #js {:className "anno-display"
                 :style #js {:width "10%"}}
-           (pprint/cl-format nil  "~,2f" (js/parseFloat (-> (get-in dbr [:hit :hsps])
-                                                            first
-                                                            :Hsp_bit-score))))
+           (ut/round-n {:n (js/parseFloat (-> (get-in dbr [:hit :hsps])
+                                              first
+                                              :Hsp_bit-score))}))
    (dom/td #js {:className "anno-display"
                 :style #js {:width "15%"}}
-           (pprint/cl-format nil  "~,2e" (js/parseFloat (-> (get-in dbr [:hit :hsps])
-                                                            first
-                                                            :Hsp_evalue))))
+           (ut/round-n {:n (js/parseFloat (-> (get-in dbr [:hit :hsps])
+                                              first
+                                              :Hsp_evalue))
+                        :format :exp}))
    (dom/td #js {:className "anno-display"
                 :style #js {:width "60%"}}
            (get-in dbr [:hit :Hit_def]))))

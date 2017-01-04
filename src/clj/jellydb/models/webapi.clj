@@ -104,9 +104,9 @@
     {:status :failure :message "Something wrong with proteomics retrieval by accession."}))
 
 (defmethod serve/get-data :jellydb.dataset-view/dataset
-  [{:keys [dataset] :as m}]
+  [{:keys [dataset accession] :as m}]
   (if-let [r (get-sequences m)]
-    {:status :success :data (first r)}
+    {:status :success :data r}
     {:status :failure :message "Something wrong with dataset retrieval."}))
 
 (defmethod serve/get-data :jellydb.homology-view/db-name
@@ -120,6 +120,13 @@
   (if-let [r (get-sequences (assoc m :accessions [accession]))]
     {:status :success :data r}
     {:status :failure :message "Something wrong with blast retrieval by accession."}))
+
+(defmethod serve/get-data :jellydb.proteomics/peptides
+  [{:keys [accession dataset] :as m}]
+  (if-let [r (get-sequences (assoc m :accessions accession
+                                  :dataset dataset))]
+    {:status :success :data r}
+    {:status :failure :message "Something wrong with msms-peptide retrieval."}))
 
 ;; queries
 
@@ -136,8 +143,8 @@
     {:status :failure :message "Something wrong with homologies query."}))
 
 (defmethod serve/get-data :jellydb.proteins/proteomics?
-  [{:keys [accession] :as m}]
-  (if-let [r (get-sequences (assoc m :accessions [accession]))]
+  [{:keys [accession dataset] :as m}]
+  (if-let [r (get-sequences (assoc m :accessions [accession] :dataset dataset))]
     {:status :success :data (if (seq r) true false)}
     {:status :failure :message "Something wrong with proteomics query."}))
 

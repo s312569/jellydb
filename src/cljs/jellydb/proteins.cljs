@@ -213,102 +213,88 @@
   (let [tf #(if (> (count %) 70) (str (->> % (take 70) (apply str)) " ...") %)]
     (dom/div
      #js {:className "pure-u-23-24 thick" :style #js {:text-align "left"}}
-     (str (:accession protein) " - " (tf (:description protein))))))
+     (str (:accession protein) " - " (tf (:description protein))
+          " [" (:species protein) "]"))))
 
-(defmulti menu-disabled? (fn [t o] t))
-
-(defmethod menu-disabled? :default
-  [_ _]
-  false)
-
-(defmethod menu-disabled? :annotation
-  [t o]
-  (not (om/get-state o ::annotations?)))
-
-(defmethod menu-disabled? :homology
-  [t o]
-  (not (om/get-state o ::homologies?)))
-
-(defmethod menu-disabled? :proteomics
-  [t o]
-  (not (om/get-state o ::proteomics?)))
+(defn- check-active
+  [tag protein owner]
+  (if (#{:annotation :homology :proteomics} tag)
+    (serve/get-data-check {:type ({:annotation ::annotations?
+                                   :homology ::homologies?
+                                   :proteomics ::proteomics?} tag)
+                           :accession (:accession protein)}
+                          :active owner)))
 
 (defn- bottom-link
-  [[text tag] owner]
-  (let [cs (om/get-state owner :visible)
-        dis? (menu-disabled? tag owner)]
-    (dom/li
-     #js {:className (cond (= cs tag)
-                           "pure-menu-item mselected my-cursor"
-                           dis?
-                           "pure-menu-item pure-menu-disabled"
-                           :else
-                           "pure-menu-item my-cursor")}
-     (if-not dis?
-       (dom/a
-        #js {:className "pure-menu-link"
-             :disabled "true"
-             :onClick (fn [x]
-                        (and (not dis?)
-                             (if (= tag cs)
-                               (om/set-state! owner :visible :none)
-                               (om/set-state! owner :visible tag))))}
-        text)
-       text))))
-
-(defn- bottom-menu
-  [protein owner]
-  (let [views (om/get-state owner :views)]
-    (dom/div
-     #js {:className "pure-u-1-1"}
-     (dom/div #js {:className "pure-u-1-24"} "")
-     (dom/div
-      #js {:className "pure-u-23-24" :style #js {:text-align "left"}}
-      (dom/div
-       #js {:className "pure-menu pure-menu-horizontal"
-            :style #js {:position "relative"}}
-       (apply
-        dom/ul
-        #js {:className "pure-menu-list"}
-        (map #(bottom-link % owner) views)))))))
-
-(defn- bottom-view
-  [protein owner]
-  (let [visible (om/get-state owner :visible)]
-    (if (= visible :none)
-      (dom/div nil "")
-      (dom/div
-       #js {:className "pure-u-1-1"}
-       (dom/div
-        #js {:className "pure-u-23-24"}
-        (dom/div
-         #js {:style #js {:position "relative"}}
-         (if-not (= visible :none)
-           (dom/div
-            #js {:style #js {:position "absolute" :top "-10" :right "10" :color "#cad2d3"}}
-            (dom/a
-             #js {:onClick #(om/set-state! owner :visible :none)
-                  :style #js {:cursor "pointer"}}
-             "Close")))
-         (dom/div
-          #js {:className "tbpadded" :style #js {:text-align "left"}}
-          (condp = visible
-            :protein (om/build sequence-view {:protein protein :type ::protein})
-            :cds (om/build sequence-view {:protein protein :type ::cds})
-            :mrna (om/build sequence-view {:protein protein :type ::mrna})
-            :annotation (om/build ann/annotation-view protein)
-            :dataset (om/build data/dataset-view protein)
-            :homology (om/build homology-view protein)
-            :blast (om/build blast-output-view protein)
-            :proteomics (om/build proteomics-view protein)
-            nil))))))))
-
-(defn- protein [protein owner]
+  [{:keys [tag current protein ch-chan]} owner]
   (reify
     om/IInitState
     (init-state [_]
-      {:visible (if (:Hit_id protein) :blast :none)
-       :views (let [v  [["Protein" :protein]
+      {:active (if (#{:annotation :homology :proteomics} (second tag)) false true)
+       :accession (:accession protein)})
+    om/IWillMount
+    (will-mount [_]
+      (check-active (second tag) protein owner))
+    om/IWillReceiveProps
+    (will-receive-props [_ {:keys [protein tag]}]
+      (when-not (= (:accession protein) (om/get-state owner :accession))
+        (om/set-state! owner :accession (:accession protein))
+        (check-active (second tag) protein owner)))
+    om/IRenderState
+    (render-state [_ {:keys [active]}]
+      (dom/li
+       #js {:className (cond (= current (second tag))
+                             "pure-menu-item mselected my-cursor"
+                             (not active)
+                             "pure-menu-item pure-menu-disabled"
+                             :else
+                             "pure-menu-item my-cursor")}
+       (if active
+         (dom/a
+          #js {:className "pure-menu-link"
+               :disabled "true"
+               :onClick (fn [x]
+                          (if (= (second tag) current)
+                            (put! ch-chan :none)
+                            (put! ch-chan (second tag))))}
+          (first tag))
+         (first tag))))))
+
+(defn- bottom-view
+  [{:keys [protein current ch-chan]} owner]
+  (om/component
+   (dom/div
+    #js {:className "pure-u-1-1"}
+    (dom/div
+     #js {:className "pure-u-23-24"}
+     (dom/div
+      #js {:style #js {:position "relative"}}
+      (dom/div
+       #js {:style #js {:position "absolute" :top "-10"
+                        :right "10" :color "#cad2d3"}}
+       (dom/a
+        #js {:onClick #(put! ch-chan :none)
+             :style #js {:cursor "pointer"}}
+        "Close"))
+      (dom/div
+       #js {:className "tbpadded" :style #js {:text-align "left"}}
+       (condp = current
+         :protein (om/build sequence-view {:protein protein :type ::protein})
+         :cds (om/build sequence-view {:protein protein :type ::cds})
+         :mrna (om/build sequence-view {:protein protein :type ::mrna})
+         :annotation (om/build ann/annotation-view protein)
+         :dataset (om/build data/dataset-view protein)
+         :homology (om/build homology-view protein)
+         :blast (om/build blast-output-view protein)
+         :proteomics (om/build proteomics-view protein)
+         nil)))))))
+
+(defn- bottom-menu
+  [protein owner]
+  (reify
+    om/IInitState
+    (init-state [_]
+      {:views (let [v  [["Protein" :protein]
                         ["CDS" :cds]
                         ["mRNA" :mrna]
                         ["Annotations" :annotation]
@@ -319,33 +305,52 @@
                   (-> (cons ["Blast" :blast] v)
                       vec)
                   v))
-       ::annotations? false
-       ::homologies? false
-       ::proteomics? false})
+       :current :none
+       :chan (chan)
+       :accession (:accession protein)})
     om/IWillMount
     (will-mount [_]
-      (doseq [t [::annotations? ::homologies? ::proteomics?]]
-        (serve/get-data-check {:type t :accession (:accession protein)}
-                              t
-                              owner)))
+      (go
+        (while true
+          (om/set-state! owner :current (<! (om/get-state owner :chan))))))
     om/IWillReceiveProps
-    (will-receive-props [_ np]
-      (om/set-state! owner :visible :none)
-      (doseq [t [::annotations? ::homologies? ::proteomics?]]
-        (serve/get-data-check {:type t :accession (:accession protein)}
-                              t
-                              owner)))
+    (will-receive-props [_ protein]
+      (when-not (= (om/get-state owner :accession) (:accession protein))
+        (om/set-state! owner :accession (:accession protein))
+        (om/set-state! owner :current :none)))
     om/IRenderState
-    (render-state [_ {:keys [visible views]}]
+    (render-state [_ {:keys [views current chan]}]
       (dom/div
-       #js {:className "pdisplay"}
+       nil
        (dom/div
         #js {:className "pure-u-1-1"}
-        (protein-cb protein)
-        (protein-description protein)
-        (protein-lower-info protein)
-        (bottom-menu protein owner)
-        (bottom-view protein owner))))))
+        (dom/div #js {:className "pure-u-1-24"} "")
+        (dom/div
+         #js {:className "pure-u-23-24" :style #js {:text-align "left"}}
+         (dom/div
+          #js {:className "pure-menu pure-menu-horizontal"
+               :style #js {:position "relative"}}
+          (apply
+           dom/ul
+           #js {:className "pure-menu-list"}
+           (om/build-all bottom-link
+                         (map #(hash-map :tag % :protein protein
+                                         :current current :ch-chan chan)
+                              views))))))
+       (if-not (= current :none)
+         (om/build bottom-view
+                   {:protein protein :current current :ch-chan chan}))))))
+
+(defn- protein [{:keys [protein]} owner]
+  (om/component
+   (dom/div
+    #js {:className "pdisplay"}
+    (dom/div
+     #js {:className "pure-u-1-1"}
+     (protein-cb protein)
+     (protein-description protein)
+     (protein-lower-info protein)
+     (om/build bottom-menu protein)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; navigation
@@ -500,7 +505,8 @@
          (apply
           dom/div
           #js {:className "pure-u-1-1 padded"}
-          (om/build-all protein prots)))
+          (om/build-all protein (map #(hash-map :protein % :app app)
+                                     prots))))
        (om/build navigation app)))))
 
 (defmulti no-results :search-type)
