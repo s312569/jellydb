@@ -312,25 +312,44 @@
 ;; proteins for display
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmethod get-sequences [:by-key :text-proteins]
-  [{:keys [data offset] :as m}]
-  (get-annotated-sequences {:table :peptides
-                            :where "peptides.accession ILIKE ?
-                                    or annotations.description ILIKE ?"
-                            :order :accession
-                            :offset offset
-                            :limit 20
-                            :parameters [(str "%" data "%") (str "%" data "%")]}))
+(defmulti count-results :type)
 
-(defmethod get-sequences [:jellydb.proteins/select-all :text-proteins]
-  [{:keys [data] :as m}]
-  (get-annotated-sequences {:table :peptides
-                            :select "peptides.accession"
-                            :where "peptides.accession ILIKE ?
-                                    or annotations.description ILIKE ?"
-                            :parameters [(str "%" data "%") (str "%" data "%")]
-                            :apply-func #(vec (map :accession %))}))
+(let [search-query (fn [data]
+                     (let [w (string/split data #"\s+")]
+                       {:where (->> (repeat (count w)
+                                            (str "(peptides.accession ILIKE ? "
+                                                 "or annotations.description ILIKE ? "
+                                                 "or datasets.species ILIKE ?)"))
+                                    (interpose " AND ")
+                                    (apply str))
+                        :parameters (->> (mapcat #(->> (str "%" % "%")
+                                                       repeat
+                                                       (take 3))
+                                                 w)
+                                         vec)}))]
 
+  (defmethod count-results :text
+    [{:keys [data] :as m}]
+    (get-annotated-sequences (merge (search-query data) {:table :peptides
+                                                         :select "count(peptides.accession)"
+                                                         :apply-func #(:count (first %))})))
+
+  (defmethod get-sequences [:by-key :text-proteins]
+    [{:keys [data offset] :as m}]
+    (get-annotated-sequences (merge (search-query data) {:table :peptides
+                                                         :order :accession
+                                                         :offset offset
+                                                         :limit 20})))
+
+  (defmethod get-sequences [:jellydb.proteins/select-all :text-proteins]
+    [{:keys [data] :as m}]
+    (get-annotated-sequences (merge (search-query data) {:table :peptides
+                                                         :select "peptides.accession"
+                                                         :apply-func #(vec (map :accession %))}))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; selected
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmethod get-sequences [:by-key :only-selected]
   [{:keys [data offset] :as m}]
@@ -342,6 +361,10 @@
 (defmethod get-sequences [:jellydb.proteins/select-all :only-selected]
   [{:keys [data] :as m}]
   (:data m))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; blasts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmethod get-sequences [:by-key :blast-search]
   [{:keys [offset file] :as m}]
@@ -442,7 +465,7 @@
     (bdb/query-sequences dbspec q :default :apply-func #(:id (first %)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; blasts
+;; homologies
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (derive :jellydb.proteins/homologies? :jellydb.homology-view/blasts)
@@ -485,21 +508,6 @@
 (defn internal-blast-dbs
   [did]
   (bdb/query-sequences dbspec ["select * from blastfiles where did!=?" did] :blast-file))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; counting results
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defmulti count-results :type)
-
-(defmethod count-results :text
-  [{:keys [data] :as m}]
-  (get-annotated-sequences {:table :peptides
-                            :select "count(peptides.accession)"
-                            :where "peptides.accession ILIKE ?
-                                    or annotations.description ILIKE ?"
-                            :parameters [(str "%" data "%") (str "%" data "%")]
-                            :apply-func #(:count (first %))}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; inserting

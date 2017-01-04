@@ -48,7 +48,7 @@
        :ph placeholder})
     om/IRenderState
     (render-state [_ {:keys [text ph]}]
-      (let [t (trim text)]
+      (let [t text]
         (dom/div
          nil
          (dom/div
