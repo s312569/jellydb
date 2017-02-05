@@ -37,6 +37,7 @@
                              (remove nil?)
                              (map #(update-in % [:Hit_id] parse-id))
                              (map #(hash-map :hit % :database did
+                                             :hitid (:Hit_id %)
                                              :accession (:query-accession %)))
                              (insert-sequences :blasts))))
                     files))

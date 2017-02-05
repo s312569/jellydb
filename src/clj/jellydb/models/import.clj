@@ -203,7 +203,7 @@
 ;; import api
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmulti import-dataset (fn [m] (get-in m [:dataset :type])))
+(defmulti import-dataset (fn [m _] (get-in m [:dataset :type])))
 
 (defmethod import-dataset :assembly
   [{:keys [dataset] :as m} submitter]
@@ -225,7 +225,7 @@
     (bdb/with-transaction [con dbspec]
       (transdecode @did con))
     (bdb/with-transaction [con dbspec]
-      (internal-blast-db @did m))
+      (internal-blast-db @did dataset))
     (bdb/with-transaction [con dbspec]
       (blast-dataset @did))
     (bdb/with-transaction [con dbspec]
@@ -235,7 +235,7 @@
 ;; testing
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def test-submit {:files ["/home/jason/Dropbox/jellydb/resources/test-data/chironex-assembly.fasta"]
+(def test-submit {:files ["/home/jason/Dropbox/raw-proteomics-data/jellydb-data/cubozoa/chironex_fleckeri/good.Trinity.fasta"]
                   :dataset {:name "test"
                             :abstract "this is an abstract"
                             :pmid ["123456" "78910"]

@@ -32,7 +32,8 @@
                                             [{:first "DB"
                                               :last "Maintainer"
                                               :email ""
-                                              :address "Here"}])
+                                              :address "Here"}]
+                                            true)
                      first
                      :id)
             did (->> (bdb/insert-sequences! con :datasets :dataset
@@ -40,7 +41,8 @@
                                               :abstract "SwissProt data"
                                               :species "All"
                                               :submitter sid
-                                              :type "proteins"}])
+                                              :type "proteins"}]
+                                            true)
                      first
                      :id)]
         (fasta-insert [f] :swissprots :swissprot did con)
@@ -74,7 +76,8 @@
 
 (defn create-database
   []
-  (map (fn [[k v]] (bdb/create-table! dbspec k v)))
+  (doseq [[k v] tables]
+    (bdb/create-table! dbspec k v))
   (import-swissprot))
 
 (defn delete-database
@@ -214,6 +217,7 @@
   (vector [:id :serial "PRIMARY KEY"]
           [:accession :text "NOT NULL"]
           [:database :integer "NOT NULL"]
+          [:hitid :text "NOT NULL"]
           [:hit :text "NOT NULL"]))
 
 (defmethod bdb/prep-sequences :jdb-blast
