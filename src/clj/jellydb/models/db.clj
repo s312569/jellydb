@@ -518,8 +518,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn insert-sequences
-  [table coll]
-  (bdb/insert-sequences! dbspec table (table-type table) coll))
+  ([table coll] (insert-sequences table nil coll))
+  ([table db coll]
+   (bdb/insert-sequences! (or db dbspec) table (table-type table) coll)))
 
 (defn insert-or-retrieve-submitter
   ([{:keys [first-name last-name email] :as m}]

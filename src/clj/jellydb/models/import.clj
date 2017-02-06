@@ -194,10 +194,11 @@
 
 (defn- annotate
   [did]
-  (apply-to-dataset {:table :peptides :did did
-                     :func #(dorun (->> (map (fn [x] (annotation (:accession x))) %)
-                                        (remove nil?)
-                                        (insert-sequences :annotations)))}))
+  (bdb/with-transaction [con dbspec]
+    (apply-to-dataset {:table :peptides :did did
+                       :func #(->> (map (fn [x] (annotation (:accession x))) %)
+                                   (remove nil?)
+                                   (insert-sequences :annotations con))})))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; import api
@@ -222,14 +223,21 @@
                     :dbspec con
                     :type :sequence})
       (insert-contigs m @did con))
+    (println "Successfully saved submitter, dataset pmids and contigs")
     (bdb/with-transaction [con dbspec]
       (transdecode @did con))
+    (println "Successfully transdecoded and saved peptides.")
     (bdb/with-transaction [con dbspec]
       (internal-blast-db @did dataset))
+    (println "Internal blast completed.")
     (bdb/with-transaction [con dbspec]
       (blast-dataset @did))
+    (println "Dataset blast completed.")
     (bdb/with-transaction [con dbspec]
-      (ip/ips-dataset @did))))
+      (ip/ips-dataset @did))
+    (println "Interproscan completed.")
+    (annotate @did)
+    (println "Successfully annotated sequences.")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; testing
